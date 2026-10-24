@@ -3,6 +3,8 @@
 **Neues, eigenständiges Projekt** (nicht auf solarics.de oder der bisherigen Scraper-Pipeline aufgebaut)
 Stand: 24.10.2026 · Grundlagen: PDF „Grundfos Pumpen – Data crawling“ (12.03.2021), kompletter Google-Drive-Ordner, Marktrecherche
 
+> **Korrektur nach dem Datenaudit (24.10.2026):** Abschnitt 2 und 3 unterschätzen die vorhandenen Daten. Die DATANORM-Dateien von Grundfos (Stand 2014–01/2016) enthalten für rund 12.000–20.000 Artikel Kurz- und Langtexte, EAN, Listenpreise und technische Werte. Die GPC-Software liefert Anleitungen, Explosionszeichnungen und Sortimentslisten; ihre Produktdatenbank `GPI.MDF` fehlt aber in der Drive-Kopie. Details: [`02-Datenaudit-und-Datenmodell.md`](02-Datenaudit-und-Datenmodell.md).
+
 ---
 
 ## 1. Kurzfazit
