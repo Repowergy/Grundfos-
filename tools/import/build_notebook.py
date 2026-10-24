@@ -31,27 +31,21 @@ from google.colab import drive, userdata
 drive.mount('/content/drive')
 !pip -q install "psycopg[binary]>=3.1"
 """),
-    md("## Verbindung prüfen"),
-    py("""
-import psycopg
-from urllib.parse import urlsplit
-url = (userdata.get('SUPABASE_DB_URL') or '').strip()
-u = urlsplit(url)
-print('Host:', u.hostname, '| Port:', u.port, '| Benutzer:', u.username)  # Passwort wird nicht angezeigt
-if not url.startswith('postgresql://'):
-    raise SystemExit('Der Wert muss mit postgresql:// beginnen – bitte die komplette Verbindungszeile einfügen.')
-if '[YOUR-PASSWORD]' in url:
-    raise SystemExit('Im Secret steht noch [YOUR-PASSWORD] – bitte durch das Datenbank-Passwort ersetzen.')
-if (u.hostname or '').startswith('db.'):
-    raise SystemExit('Das ist die direkte Verbindung (db.…supabase.co), die Colab nicht erreicht. '
-                     'Bitte in Supabase → Connect → Direct → „Session pooler“ wählen (Host …pooler.supabase.com).')
-with psycopg.connect(url, connect_timeout=20) as con:
-    print(con.execute('select version()').fetchone()[0][:60])
-    print(con.execute("select count(*) from information_schema.tables where table_schema in ('raw','pim')").fetchone()[0], 'Tabellen in raw/pim')
-"""),
     md("## Code (muss nicht verändert werden)"),
     py("%%writefile /content/datenaudit.py\n" + helpers),
     py("%%writefile /content/datanorm_import.py\n" + code),
+    md("## Verbindung prüfen"),
+    py("""
+import sys, importlib, psycopg
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import
+importlib.reload(datenaudit); importlib.reload(datanorm_import)
+params = datanorm_import.conn_params(userdata.get('SUPABASE_DB_URL') or '')
+print('Host:', params['host'], '| Port:', params['port'], '| Benutzer:', params['user'])  # Passwort wird nicht angezeigt
+with psycopg.connect(**params) as con:
+    print(con.execute('select version()').fetchone()[0][:60])
+    print(con.execute("select count(*) from information_schema.tables where table_schema in ('raw','pim')").fetchone()[0], 'Tabellen in raw/pim')
+"""),
     md("## Import starten"),
     py("""
 import os, sys, importlib

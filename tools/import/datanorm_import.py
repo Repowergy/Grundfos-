@@ -54,7 +54,25 @@ def db_url():
             url = None
     if not url:
         raise SystemExit("SUPABASE_DB_URL fehlt (Colab: Schlüssel-Symbol → Secret anlegen).")
-    return url
+    return url.strip()
+
+
+def conn_params(url):
+    """Verbindungszeile robust zerlegen – auch wenn das Passwort Sonderzeichen wie [ ] @ # / ? enthält."""
+    m = re.match(r"^postgres(?:ql)?://([^:/@]+):(.*)@([^@/:]+):(\d+)/([^?]*)", url.strip())
+    if not m:
+        raise SystemExit("Verbindungszeile nicht erkannt. Erwartet: "
+                         "postgresql://postgres.<projekt>:<passwort>@<host>.pooler.supabase.com:5432/postgres")
+    user, pw, host, port, db = m.groups()
+    if pw.startswith("[") and pw.endswith("]"):
+        pw = pw[1:-1]          # eckige Klammern aus der Vorlage mitkopiert
+    if pw == "YOUR-PASSWORD":
+        raise SystemExit("Im Secret steht noch [YOUR-PASSWORD] – bitte durch das Datenbank-Passwort ersetzen.")
+    if host.startswith("db."):
+        raise SystemExit("Das ist die direkte Verbindung (db.…supabase.co), die Colab nicht erreicht. "
+                         "Bitte Supabase → Connect → Direct → „Session pooler“ verwenden.")
+    return {"host": host, "port": int(port), "user": user, "password": pw, "dbname": db or "postgres",
+            "connect_timeout": 20, "sslmode": "disable" if host in ("localhost", "127.0.0.1") else "require"}
 
 
 def sha256_of(path):
@@ -480,7 +498,7 @@ def run(root="/content/drive/MyDrive", overrides=None):
     if overrides:
         CONFIG.update(overrides)
     t0 = time.time()
-    with psycopg.connect(db_url(), autocommit=False) as con:
+    with psycopg.connect(**conn_params(db_url()), autocommit=False) as con:
         with con.cursor() as cur:
             cur.execute("insert into raw.import_lauf (werkzeug, notiz) values (%s, %s) returning id",
                         ("datanorm_import v1", "DATANORM + Artikelliste + Produktgruppen"))
