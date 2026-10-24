@@ -12,7 +12,13 @@ Stand: 24.10.2026 · Basis: Supabase-Projekt `Grundfos-PIM` (Schema `raw` + `pim
 | DATANORM Grundfos GmbH 2014 + 2016, Ersatzteile 2016, VPE 2016 | ca. 28.000 | EAN, Listenpreis, Kurz-, Lang- und Techniktext |
 | DATANORM „GF“ 12/2015 | 8.662 | Grundfos-Nummern und -EAN, Langtexte |
 
-### Was die Großhändler zusätzlich liefern
+**Stand nach Bereinigung (24.10.2026, Notebook `tools/import/DB_Pflege_Colab.ipynb`):**
+Großhändler und Fremdhersteller sind aus `pim` entfernt; die Rohdaten in `raw` bleiben erhalten.
+Danach: 15 Quellen (12 Grundfos-DATANORM, „GF“-Datei, 2 Artikellisten) · **811.769 Artikel** · 15.623 Grundfos-EAN ·
+20.301 Artikel mit Listenpreis · je 23.861 Lang- und Techniktexte (2014: 11.630, 2016: 12.231), Techniktexte
+korrekt aus Vorlage + Werten, keine offenen `$`, Silbentrennung aufgelöst (übrig nur Ergänzungsstriche wie „Saug- und“).
+
+### Was die Großhändler zusätzlich liefern (nicht übernommen, Rohdaten vorhanden)
 
 | Großhändler | Grundfos-Artikel | davon in Liste | davon in DATANORM 2014/16 | **nur hier** | Zuordnung |
 |---|---|---|---|---|---|
