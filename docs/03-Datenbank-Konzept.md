@@ -34,6 +34,38 @@ Bei Taxis sind es vor allem Industriepumpen: NK/NKE-Normpumpen, NB-Blockpumpen, 
 
 ---
 
+## 1b. Access-Datenbanken der alten Grundfos-Software (Inventar 24.10.2026)
+
+Ordner *GRUNDFOS – Zentrale Projektablage / Historische Grundfos-Software und Access-Datenbanken*.
+
+### `gpi.mdb` – Grundfos Product Center, Export 10.10.2015 (989 MB, 153 Tabellen) ⭐
+Das ist die Quelle für die **Verlinkungen**:
+
+| Bereich | Tabellen (Zeilen) | Nutzen für den Shop |
+|---|---|---|
+| Produkte | `Products2` (427.538: Nummer, EAN, Produktgruppe, 50/60 Hz, Status, Typname, 88 Datenspalten), `Prodnames` (60.289), `PG` (1.351 Produktgruppen mit Beschreibung), `ColText` (133.505 Werte) | Artikel, EAN, Typbezeichnung, technische Daten |
+| Merkmalskatalog | `DL` (2.438 Merkmale mit Name, Beschreibung, Einheit), `DLPoss`, `Domain`, `Clas` | sprachneutrale Merkmale (Kap. 3.2), Filter |
+| **Ersatzteile** | `Master` (391.683 Teile), `PartList` (**7.042.649** Stücklistenzeilen), `PartDetails` (198.371: Menge, Position), `PartValidity` (2.032 Gültigkeitszeiträume), `ChangeNote` (853), `PLText` (3.305 Teilebezeichnungen), `BULKS`, `PACKAGINGNUMBERS` (10.841) | Ersatzteil je Pumpe **mit Positionsnummer und Produktionszeitraum** |
+| Zeichnungen & Dokumente | `PartDrawingLink` (446.639), `DF` (15.897 Dateien mit Sprache), `ProdDF`, `IT`/`ITDF` (Infobaum), `Literature` (5.816), `LiteratureFile` (32.379, **je Sprache**), `LiteraturePGLink` (20.088) | Explosionszeichnung, Datenblatt, Anleitung je Artikel/Sprache |
+| Zubehör | `ACCLINK` (32.149) | Zubehör je Pumpe |
+| **Austausch Wettbewerb** | `ReplSystem50` (15.335 Fremdpumpen: Hersteller, Typ, Anschluss, Baulänge, Leistung), `ReplPumps50` (83.040 Grundfos-Ersatz), `ReplManufactName` (98 Hersteller), 60-Hz-Varianten, `CompetitorProducts` (7.982) + `CompetitorProductData` (162.075) | „Wilo/KSB/DAB XY ersetzen durch …“ – Austauschfinder |
+| Kennlinien | `HydraulicObject` (56.475), `HydraulicLink` (287.396), `Curve2`, `Curveset`, `Polynom` (50.136), Motor-Kennlinien | Pumpenauslegung (Q/H), Energieberechnung |
+| Länder-Sortimente | `ProductRange_*` (je Land: Nummer, Preis, Status), z. B. `General` 212.337, `gnl` 206.889 | Sortiment/Status je Markt, Altpreise als Referenz |
+| Sonstiges | `LANG` (35 Sprachen), `LIQUIDS` (187 Medien) + `LIQUIDSYNONYMS` (607), `Application` (220 Anwendungen) | Anwendungs- und Medienfilter |
+
+Import: `tools/import/Import_GPI_Colab.ipynb` → Schema `gpi` (1:1, alle Spalten als Text, Schlüssel indiziert).
+Danach Zuordnung nach `pim` (Artikel, `artikel_beziehung` Ersatzteil/Zubehör/Nachfolger, `medium`, `zeichnung_position`,
+`querverweis_wettbewerb`) per SQL.
+
+### Übrige Dateien
+- **`ETB.MDB` (43 MB): kein Grundfos!** Inhalt sind KSB-Baureihen (Amarex, Ama-Drainer, Etabloc, Multitec) mit
+  Teileliste (278.291), Teilestamm (13.952, Preise in DM) und Zeichnungs-Hotspots. Nach der Entscheidung „nur Grundfos“
+  wird sie nicht importiert. Die Kopien `ETB (1)/(2).MDB` sind identisch.
+- `ETBv.MDB`, `ETB_WAE.MDB`, `ETB_DTXT.MDB`: Angebots-/Bestellmasken, Währungen, Formulartexte – leer bzw. ohne Produktdaten.
+- `GPIUser.mdb`: leere Benutzerdatenbank der Software.
+
+---
+
 ## 2. Leitidee: Daten statt Texte
 
 Andere Shops übersetzen Texte. Wir speichern **Fakten sprachneutral** und erzeugen daraus Texte in jeder Sprache.

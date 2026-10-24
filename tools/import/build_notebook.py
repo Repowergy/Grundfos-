@@ -124,3 +124,53 @@ with psycopg.connect(**params) as con:
 nb2 = dict(nb, cells=cells2)
 (here / "DB_Pflege_Colab.ipynb").write_text(json.dumps(nb2, ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "DB_Pflege_Colab.ipynb")
+
+# ── Import 2: gpi.mdb → Schema gpi ──
+gpi_code = (here / "gpi_import.py").read_text(encoding="utf-8")
+cells3 = [
+    md("""
+# Grundfos-PIM – Import 2: GPC-Datenbank `gpi.mdb` → Supabase
+
+Übernimmt die Access-Datenbank der Grundfos-Software (Export 10.10.2015, ca. 1 GB, 153 Tabellen)
+**1:1** in das neue Schema `gpi`: Produkte, Ersatzteillisten mit Gültigkeitszeitraum, Zeichnungen,
+Dokumente in vielen Sprachen, Zubehör, Wettbewerber-Austausch, Kennlinien, Länder-Sortimente.
+
+- Die Quelldatei wird **nur gelesen**. Programmdateien werden nicht gestartet.
+- Alles läuft in **einer Transaktion**: Bei einem Fehler wird nichts geändert.
+- Voraussetzung: Secret `SUPABASE_DB_URL` (wie beim ersten Import), Notebook-Zugriff erlauben.
+
+**Laufzeit → Alle ausführen.** Dauer ca. 20–40 Minuten (7 Mio. Zeilen Stücklisten). Fenster offen lassen.
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip -q install "psycopg[binary]>=3.1"
+!apt-get -qq install -y mdbtools > /dev/null && mdb-ver --help 2>&1 | head -1
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/gpi_import.py\n" + gpi_code),
+    md("## Verbindung prüfen"),
+    py("""
+import sys, importlib, psycopg
+sys.path.insert(0, '/content')
+import datanorm_import; importlib.reload(datanorm_import)
+params = datanorm_import.conn_params(userdata.get('SUPABASE_DB_URL') or '')
+print('Host:', params['host'], '| Port:', params['port'], '| Benutzer:', params['user'])
+with psycopg.connect(**params) as con:
+    print(con.execute('select version()').fetchone()[0][:60])
+"""),
+    md("## Import starten"),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, gpi_import
+for m in (datenaudit, datanorm_import, gpi_import): importlib.reload(m)
+gpi_import.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+nb3 = dict(nb, cells=cells3)
+(here / "Import_GPI_Colab.ipynb").write_text(json.dumps(nb3, ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_GPI_Colab.ipynb")
