@@ -199,7 +199,9 @@ def import_article_list(con, root, lauf_id):
             return
         qid = new_quelle(cur, datei_id, "artikelliste", "Grundfos Sitemap-Artikelliste 08/2026",
                          dt.date(2026, 8, 3), 30)
-        cur.execute("""create temp table tmp_liste (zeile int, daten jsonb, artnr text, norm text,
+        # Platz sparen: die 806.000 JSON-Zeilen nicht zusätzlich als Rohdaten speichern –
+        # die Quelldatei ist über Pfad + SHA-256 in raw.quelldatei eindeutig nachvollziehbar.
+        cur.execute("""create temp table tmp_liste (artnr text, norm text,
                        familie text, serie text, url text, name text) on commit drop""")
         log("Artikelliste: hochladen …")
         with open(path, encoding="utf-8", errors="replace") as fh, \
@@ -210,10 +212,10 @@ def import_article_list(con, root, lauf_id):
                     continue
                 o = json.loads(line)
                 nr = str(o.get("article_number") or "")
-                cp.write_row((i, line, nr, norm(nr), o.get("family"), o.get("series"),
+                cp.write_row((nr, norm(nr), o.get("family"), o.get("series"),
                               o.get("url"), o.get("product_name")))
-        cur.execute("""insert into raw.tabellen_zeile (datei_id, tabelle, zeile, daten)
-                       select %s, 'product_list', zeile, daten from tmp_liste""", (datei_id,))
+        cur.execute("update raw.quelldatei set zeilen = (select count(*) from tmp_liste) where id = %s",
+                    (datei_id,))
         cur.execute("""insert into pim.artikel (hersteller_id, artikelnummer, artikelnummer_norm, familie, serie, hersteller_url)
                        select distinct on (norm) %s, artnr, norm, familie, serie, url from tmp_liste where norm <> ''
                        on conflict (hersteller_id, artikelnummer_norm) do update
