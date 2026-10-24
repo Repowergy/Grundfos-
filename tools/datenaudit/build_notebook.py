@@ -76,3 +76,39 @@ nb = {"cells": cells,
       "nbformat": 4, "nbformat_minor": 0}
 (here / "Datenaudit_Colab.ipynb").write_text(json.dumps(nb, ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Datenaudit_Colab.ipynb")
+
+# ── Teil 2 ──
+code2 = (here / "datenaudit2.py").read_text(encoding="utf-8")
+cells2 = [
+    md("""
+# Grundfos Datenaudit – Teil 2
+
+**Liest nur**, verändert keine Quelldateien. Prüft:
+
+1. den echten **Grundfos-Anteil jeder DATANORM-Datei** (auch Großhändler-Dateien von 2025 und `GRUNDFOS – Zentrale Projektablage/DATANORM NEU 1`)
+2. die **Austausch-Caches** der GPC-Software (gzip-JSON entpacken)
+3. **ProdPic**, **Qtp** und die **Sprachtabellen (CTF)**
+4. **Sortimentslisten je Land** und die Austausch-Filterregeln
+5. **Datenbankdateien** (`*.mdb`, `*.accdb`, `*.mdf`) in `05 Rohdaten Import`
+
+**So geht's:** **Laufzeit → Alle ausführen**, Warnung mit „Trotzdem ausführen“ bestätigen, Drive-Zugriff erlauben.
+Ergebnis: `02 Grundfos/00_Datenaudit/ergebnis_teil2/`.
+"""),
+    py("""
+from google.colab import drive
+drive.mount('/content/drive')
+"""),
+    py("%%writefile /content/datenaudit.py\n" + code),
+    py("%%writefile /content/datenaudit2.py\n" + code2),
+    py("""
+import sys, importlib
+sys.path.insert(0, '/content')
+import datenaudit, datenaudit2
+importlib.reload(datenaudit); importlib.reload(datenaudit2)
+datenaudit2.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+nb2 = dict(nb, cells=cells2)
+(here / "Datenaudit2_Colab.ipynb").write_text(json.dumps(nb2, ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Datenaudit2_Colab.ipynb")
