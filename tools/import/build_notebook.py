@@ -63,3 +63,64 @@ nb = {"cells": cells,
       "nbformat": 4, "nbformat_minor": 0}
 (here / "Import_DATANORM_Colab.ipynb").write_text(json.dumps(nb, ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_DATANORM_Colab.ipynb")
+
+# ── DB-Pflege: Migrationen 0003 + 0004 ausführen, Texte neu aufbauen ──
+mig = here.parent.parent / "supabase" / "migrations"
+MIGS = ["20261024000003_grosshandel_entfernen.sql", "20261024000004_texte_aufbauen.sql"]
+cells2 = [
+    md("""
+# Grundfos-PIM – Datenbank-Pflege
+
+Führt in Supabase `Grundfos-PIM` nacheinander aus:
+
+1. **Großhändler und Fremdhersteller entfernen.** Behalten werden nur die Grundfos-Quellen. Die Rohdaten (`raw`) bleiben erhalten.
+2. **Textfunktionen anlegen.** Techniktexte aus Vorlage und Werten, Silbentrennung auflösen.
+3. **Lang- und Techniktexte neu aufbauen**, danach Kennzahlen und Beispiele zeigen.
+
+Alles läuft in **einer Transaktion**: Bei einem Fehler wird nichts geändert.
+Voraussetzung ist das Secret `SUPABASE_DB_URL` (wie beim Import). **Laufzeit → Alle ausführen.** Dauer: wenige Minuten.
+"""),
+    py("""
+from google.colab import userdata
+!pip -q install "psycopg[binary]>=3.1"
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+] + [py(f"%%writefile /content/{m}\n" + (mig / m).read_text(encoding="utf-8")) for m in MIGS] + [
+    py("""
+import sys, importlib, psycopg, pathlib
+sys.path.insert(0, '/content')
+import datanorm_import; importlib.reload(datanorm_import)
+params = datanorm_import.conn_params(userdata.get('SUPABASE_DB_URL') or '')
+MIGS = %r
+ZAHLEN = '''select (select count(*) from pim.quelle) quellen, (select count(*) from pim.artikel) artikel,
+  (select count(*) from pim.artikel where ean is not null) ean,
+  (select count(distinct artikel_id) from pim.artikel_preis) mit_preis,
+  (select count(*) from pim.artikel_text where art='lang') lang,
+  (select count(*) from pim.artikel_text where art='technik') technik'''
+with psycopg.connect(**params) as con:
+    con.execute('set statement_timeout = 0')
+    print('vorher:', con.execute(ZAHLEN).fetchone())
+    hat_log = con.execute("select to_regclass('supabase_migrations.schema_migrations') is not null").fetchone()[0]
+    for m in MIGS:
+        sql = pathlib.Path('/content/' + m).read_text(encoding='utf-8')
+        con.execute(sql)
+        if hat_log:
+            con.execute('insert into supabase_migrations.schema_migrations (version, name, statements) '
+                        'values (%%s, %%s, array[%%s]) on conflict do nothing',
+                        (m[:14], m[15:-4], sql))
+        print('ausgeführt:', m)
+    for art, n in con.execute('select * from pim.texte_neu_aufbauen()').fetchall():
+        print('neu aufgebaut:', art, n)
+    con.commit()
+    print('nachher:', con.execute(ZAHLEN).fetchone())
+    for nr, art, text in con.execute('''select a.artikelnummer, t.art, left(t.text, 400) from pim.artikel_text t
+          join pim.artikel a on a.id = t.artikel_id where a.artikelnummer_norm in ('011H1300','96281368','98221340')
+          order by 1, 2''').fetchall():
+        print('\\n──', nr, art, '──\\n' + text)
+""" % MIGS),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+nb2 = dict(nb, cells=cells2)
+(here / "DB_Pflege_Colab.ipynb").write_text(json.dumps(nb2, ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "DB_Pflege_Colab.ipynb")
