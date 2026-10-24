@@ -34,7 +34,18 @@ drive.mount('/content/drive')
     md("## Verbindung prüfen"),
     py("""
 import psycopg
-with psycopg.connect(userdata.get('SUPABASE_DB_URL')) as con:
+from urllib.parse import urlsplit
+url = (userdata.get('SUPABASE_DB_URL') or '').strip()
+u = urlsplit(url)
+print('Host:', u.hostname, '| Port:', u.port, '| Benutzer:', u.username)  # Passwort wird nicht angezeigt
+if not url.startswith('postgresql://'):
+    raise SystemExit('Der Wert muss mit postgresql:// beginnen – bitte die komplette Verbindungszeile einfügen.')
+if '[YOUR-PASSWORD]' in url:
+    raise SystemExit('Im Secret steht noch [YOUR-PASSWORD] – bitte durch das Datenbank-Passwort ersetzen.')
+if (u.hostname or '').startswith('db.'):
+    raise SystemExit('Das ist die direkte Verbindung (db.…supabase.co), die Colab nicht erreicht. '
+                     'Bitte in Supabase → Connect → Direct → „Session pooler“ wählen (Host …pooler.supabase.com).')
+with psycopg.connect(url, connect_timeout=20) as con:
     print(con.execute('select version()').fetchone()[0][:60])
     print(con.execute("select count(*) from information_schema.tables where table_schema in ('raw','pim')").fetchone()[0], 'Tabellen in raw/pim')
 """),
