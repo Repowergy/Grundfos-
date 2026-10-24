@@ -510,6 +510,13 @@ def run(root="/content/drive/MyDrive", overrides=None):
         import_article_list(con, root, lauf_id)
         import_datanorm(con, root, lauf_id)
         link_cross_file_langtexts(con)
+        with con.cursor() as cur:   # Großhändler-Nummern → Grundfos-Nummern, Fremdhersteller entfernen
+            cur.execute("select to_regprocedure('pim.grosshandel_zuordnen()') is not null")
+            if cur.fetchone()[0]:
+                cur.execute("select * from pim.grosshandel_zuordnen()")
+                for schritt, anzahl in cur.fetchall():
+                    log(f"Zuordnung: {schritt}: {anzahl}")
+        con.commit()
         with con.cursor() as cur:
             cur.execute("update raw.import_lauf set beendet_am = now() where id = %s", (lauf_id,))
             cur.execute("""select (select count(*) from pim.artikel),
