@@ -112,3 +112,43 @@ datenaudit2.run('/content/drive/MyDrive')
 nb2 = dict(nb, cells=cells2)
 (here / "Datenaudit2_Colab.ipynb").write_text(json.dumps(nb2, ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Datenaudit2_Colab.ipynb")
+
+# ── Access-Datenbanken (gpi.mdb, ETB*.MDB) ──
+cells3 = [
+    md("""
+# Grundfos Access-Datenbanken – Inventar
+
+**Liest nur.** Untersucht `gpi.mdb`, `GPIUser.mdb` und `ETB*.MDB` im Ordner
+*GRUNDFOS – Zentrale Projektablage / Historische Grundfos-Software und Access-Datenbanken*.
+Programmdateien (EXE) werden **nicht** gestartet.
+
+Je Datenbank: alle Tabellen mit Zeilenzahl, Spalten, 3 Beispielzeilen, dazu das komplette Schema
+mit Beziehungen. Doppelte Dateien werden erkannt und übersprungen.
+
+**So geht's:** **Laufzeit → Alle ausführen**, Drive-Zugriff erlauben. Dauer ca. 10–30 Minuten.
+Ergebnis: `02 Grundfos/00_Datenaudit/ergebnis_gpi/`.
+"""),
+    py("""
+from google.colab import drive
+drive.mount('/content/drive')
+"""),
+    py("""
+import glob, os
+ROOT = '/content/drive/MyDrive'
+DB_DIRS = [os.path.relpath(p, ROOT) for p in glob.glob(ROOT + '/*/Historische Grundfos-Software*')]
+print(DB_DIRS or 'Ordner nicht gefunden – bitte Pfad manuell eintragen')
+"""),
+    py("%%writefile /content/datenaudit.py\n" + code),
+    py("%%writefile /content/datenaudit2.py\n" + code2),
+    py("""
+import sys, importlib
+sys.path.insert(0, '/content')
+import datenaudit, datenaudit2
+importlib.reload(datenaudit); importlib.reload(datenaudit2)
+datenaudit2.run_datenbanken(ROOT, DB_DIRS)
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+nb3 = dict(nb, cells=cells3)
+(here / "Access_Datenbanken_Colab.ipynb").write_text(json.dumps(nb3, ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Access_Datenbanken_Colab.ipynb")

@@ -327,51 +327,101 @@ def have_mdbtools():
     return bool(shutil.which("mdb-tables"))
 
 
-def databases(root, cfg, out):
+def _head_lines(cmd, n=4, timeout=600):
+    """Nur die ersten n Zeilen einer (evtl. riesigen) Ausgabe lesen."""
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+                            encoding="utf-8", errors="replace")
+    lines = []
+    try:
+        for line in proc.stdout:
+            lines.append(line.rstrip("\n"))
+            if len(lines) >= n:
+                break
+    finally:
+        proc.kill()
+    return lines
+
+
+def databases(root, cfg, out, name="16_datenbanken.md", cache_dir=None):
     lines = ["# Datenbankdateien", ""]
     found = []
     for base in first_existing(root, cfg["DB_DIRS"]):
         for dp, _dn, fn in os.walk(base):
-            for name in fn:
-                if name.lower().endswith((".mdb", ".accdb", ".mdf", ".ldf", ".bak", ".sdf")):
-                    found.append(os.path.join(dp, name))
+            for fname in fn:
+                if fname.lower().endswith((".mdb", ".accdb", ".mdf", ".ldf", ".bak", ".sdf")):
+                    found.append(os.path.join(dp, fname))
     if not found:
         lines.append("Keine *.mdb/*.accdb/*.mdf gefunden in: " + ", ".join(cfg["DB_DIRS"]))
     mdb_ok = None
-    for path in sorted(found):
+    seen = {}
+    import hashlib
+    for path in sorted(found, key=lambda p: (len(p), p)):
         rel = os.path.relpath(path, root)
         size = os.path.getsize(path)
+        h = hashlib.sha256()
         with open(path, "rb") as fh:
             head = fh.read(64)
+            fh.seek(0)
+            for chunk in iter(lambda: fh.read(8 * 1024 * 1024), b""):
+                h.update(chunk)
+        digest = h.hexdigest()
         lines.append(f"## {rel} ({human(size)})")
-        lines.append(f"- Kopf: `{head[:20].hex(' ')}` → {magic_type(head, os.path.splitext(path)[1].lower())}")
+        if digest in seen:
+            lines.append(f"- Duplikat von `{seen[digest]}` – übersprungen\n")
+            continue
+        seen[digest] = rel
+        lines.append(f"- SHA-256: `{digest[:16]}…` · Kopf: `{head[:20].hex(' ')}`")
         if path.lower().endswith((".mdb", ".accdb")):
+            if cache_dir:  # lokale Kopie: mdbtools liest wahlfrei, über Drive sehr langsam
+                import shutil
+                os.makedirs(cache_dir, exist_ok=True)
+                local = os.path.join(cache_dir, digest[:12] + "_" + os.path.basename(path))
+                if not os.path.exists(local):
+                    log(f"kopiere {rel} …")
+                    shutil.copyfile(path, local)
+                path = local
             if mdb_ok is None:
                 mdb_ok = have_mdbtools()
             if not mdb_ok:
                 lines.append("- mdbtools nicht verfügbar")
                 continue
             try:
+                ver = subprocess.run(["mdb-ver", path], capture_output=True, text=True, timeout=60).stdout.strip()
                 tabs = subprocess.run(["mdb-tables", "-1", path], capture_output=True, text=True,
-                                      timeout=600).stdout.split()
-                lines.append(f"- Tabellen: {len(tabs)}")
+                                      timeout=600).stdout.split("\n")
+                tabs = [t for t in tabs if t.strip()]
+                lines.append(f"- Access-Version: {ver} · Tabellen: {len(tabs)}")
+                schema = subprocess.run(["mdb-schema", path, "postgres"], capture_output=True, text=True,
+                                        timeout=600).stdout
+                sname = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.basename(rel)) + ".schema.sql"
+                with open(os.path.join(out, sname), "w", encoding="utf-8") as fh:
+                    fh.write(schema)
+                lines.append(f"- Schema inkl. Beziehungen: `{sname}`")
                 for t in tabs:
                     cnt = subprocess.run(["mdb-count", path, t], capture_output=True, text=True,
-                                         timeout=600).stdout.strip()
-                    cols = subprocess.run(["mdb-export", "-H", path, t], capture_output=True,
-                                          text=True, timeout=600).stdout
-                    hdr = subprocess.run(["mdb-export", path, t], capture_output=True, text=True,
-                                         timeout=600).stdout.splitlines()[:3]
+                                         timeout=900).stdout.strip()
+                    rows = _head_lines(["mdb-export", "-Q", "-d", "\t", path, t], n=4)
                     lines.append(f"  - **{t}** ({cnt} Zeilen)")
-                    for h in hdr:
-                        lines.append(f"    - `{h[:300]}`")
+                    if rows:
+                        lines.append(f"    - Spalten: `{rows[0][:600]}`")
+                        for r in rows[1:]:
+                            lines.append(f"    - `{r[:400]}`")
             except Exception as e:  # noqa: BLE001
                 lines.append(f"- Fehler: {e!r}")
         elif path.lower().endswith(".mdf"):
             lines.append("- SQL-Server-Datei: wird im nächsten Schritt mit SQL Server ausgelesen")
-    with open(os.path.join(out, "16_datenbanken.md"), "w", encoding="utf-8") as fh:
+        lines.append("")
+    with open(os.path.join(out, name), "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
-    log(f"Datenbanken: {len(found)} Dateien")
+    log(f"Datenbanken: {len(found)} Dateien, {len(seen)} eindeutig")
+
+
+def run_datenbanken(root, db_dirs, output_dir="02 Grundfos/00_Datenaudit/ergebnis_gpi",
+                    cache_dir="/content/mdb_cache"):
+    out = os.path.join(root, output_dir)
+    os.makedirs(out, exist_ok=True)
+    databases(root, {"DB_DIRS": db_dirs}, out, name="20_access_datenbanken.md", cache_dir=cache_dir)
+    log(f"FERTIG → {out}")
 
 
 def run(root, overrides=None):
