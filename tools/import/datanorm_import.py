@@ -273,8 +273,10 @@ def import_datanorm_file(con, root, lauf_id, path, known):
     hersteller_kopf = "GRUNDFOS" in v.upper()
     gf_code = bool(re.search(r"(^|[;\s])GF alle Preisangaben", v))   # Grundfos-Daten über Großhandel/Datendienst
     gf_kopf = hersteller_kopf or gf_code
-    if not gf and not (is_aux and gf_kopf) and not (gf_kopf and n_a == 0):
-        log(f"  überspringe (kein Grundfos): {rel}")
+    if not gf_kopf:
+        # Entscheidung 24.10.2026: nur Grundfos-Quellen (Grundfos GmbH, „GF“-Datei); Großhändler und
+        # Fremdhersteller werden nicht übernommen
+        log(f"  überspringe (keine Grundfos-Quelle): {rel}")
         return
     anteil = len(gf) / n_a if n_a else 1.0
     voll = anteil >= CONFIG["VOLL_AB_ANTEIL"] or gf_kopf
@@ -510,13 +512,6 @@ def run(root="/content/drive/MyDrive", overrides=None):
         import_article_list(con, root, lauf_id)
         import_datanorm(con, root, lauf_id)
         link_cross_file_langtexts(con)
-        with con.cursor() as cur:   # Großhändler-Nummern → Grundfos-Nummern, Fremdhersteller entfernen
-            cur.execute("select to_regprocedure('pim.grosshandel_zuordnen()') is not null")
-            if cur.fetchone()[0]:
-                cur.execute("select * from pim.grosshandel_zuordnen()")
-                for schritt, anzahl in cur.fetchall():
-                    log(f"Zuordnung: {schritt}: {anzahl}")
-        con.commit()
         with con.cursor() as cur:
             cur.execute("update raw.import_lauf set beendet_am = now() where id = %s", (lauf_id,))
             cur.execute("""select (select count(*) from pim.artikel),
