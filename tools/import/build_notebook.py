@@ -176,3 +176,119 @@ gpi_import.run('/content/drive/MyDrive')
 nb3 = dict(nb, cells=cells3)
 (here / "Import_GPI_Colab.ipynb").write_text(json.dumps(nb3, ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_GPI_Colab.ipynb")
+
+# ── Verknüpfen: gpi → pim (Migration 0005) ──
+def sql_notebook(datei, titel, intro, migs, aufruf, zahlen, beispiele):
+    zellen = [
+        md(f"# {titel}\n\n{intro}\n\nAlles läuft in **einer Transaktion**: Bei einem Fehler wird nichts geändert.\n"
+           "Voraussetzung: Secret `SUPABASE_DB_URL`. **Laufzeit → Alle ausführen.**"),
+        py('from google.colab import userdata\n!pip -q install "psycopg[binary]>=3.1"'),
+        py("%%writefile /content/datenaudit.py\n" + helpers),
+        py("%%writefile /content/datanorm_import.py\n" + code),
+    ] + [py(f"%%writefile /content/{m}\n" + (mig / m).read_text(encoding="utf-8")) for m in migs] + [
+        py(f"""
+import sys, importlib, psycopg, pathlib, time
+sys.path.insert(0, '/content')
+import datanorm_import; importlib.reload(datanorm_import)
+params = datanorm_import.conn_params(userdata.get('SUPABASE_DB_URL') or '')
+MIGS = {migs!r}
+ZAHLEN = {zahlen!r}
+BEISPIELE = {beispiele!r}
+t0 = time.time()
+with psycopg.connect(**params) as con:
+    con.execute('set statement_timeout = 0')
+    hat_log = con.execute("select to_regclass('supabase_migrations.schema_migrations') is not null").fetchone()[0]
+    for m in MIGS:
+        sql = pathlib.Path('/content/' + m).read_text(encoding='utf-8')
+        con.execute(sql)
+        if hat_log:
+            con.execute('insert into supabase_migrations.schema_migrations (version, name, statements) '
+                        'values (%s, %s, array[%s]) on conflict do nothing', (m[:14], m[15:-4], sql))
+        print('ausgeführt:', m)
+    print('vorher:', con.execute(ZAHLEN).fetchone())
+    for schritt, n in con.execute({aufruf!r}).fetchall():
+        print(f'{{schritt:<32}} {{n:>10,}}   ({{(time.time() - t0) / 60:.1f}} min)')
+    con.commit()
+    print('nachher:', con.execute(ZAHLEN).fetchone())
+    for titel, sql in BEISPIELE:
+        print('\\n──', titel, '──')
+        for r in con.execute(sql).fetchall():
+            print(' | '.join('' if v is None else str(v) for v in r))
+"""),
+        md("## Fertig – Claude kurz Bescheid geben."),
+    ]
+    (here / datei).write_text(json.dumps(dict(nb, cells=zellen), ensure_ascii=False, indent=1), encoding="utf-8")
+    print("geschrieben:", here / datei)
+
+
+sql_notebook(
+    "GPI_Verknuepfen_Colab.ipynb",
+    "Grundfos-PIM – gpi.mdb mit dem Shop-Stamm verknüpfen",
+    """Übernimmt aus der GPC-Datenbank (Schema `gpi`, Stand 10/2015) in den Stamm `pim`:
+
+1. **fehlende Artikel** (Produkte und Teile) mit Status „historisch“ – nichts geht verloren
+2. **EAN**, wo noch keine vorhanden ist
+3. **Typbezeichnung** als Suchbegriff (z. B. „Unilift KP 150 M 1“) und englische Teilebezeichnung
+4. **Ersatzteillisten**: Pumpe → Teil mit Positionsnummer, Menge und Produktionszeitraum (ca. 7 Mio. Zeilen)
+5. **Wettbewerber-Austausch**: Fremdpumpe (Wilo, KSB, DAB …) → Grundfos-Ersatz
+
+Dauer ca. 15–40 Minuten. Fenster offen lassen.""",
+    ["20261025000005_gpi_uebernehmen.sql"],
+    "select * from pim.gpi_uebernehmen()",
+    """select (select count(*) from pim.artikel) artikel,
+  (select count(*) from pim.artikel where status = 'historisch') historisch,
+  (select count(*) from pim.artikel where ean is not null) ean,
+  (select count(*) from pim.artikel_beziehung) beziehungen,
+  (select count(*) from pim.querverweis_wettbewerb) wettbewerb""",
+    [("Ersatzteile 011H1300 (Unilift KP 150 M1)",
+      """select z.artikelnummer, t.text, b.position, b.menge, b.produktion_von, b.produktion_bis
+           from pim.artikel_beziehung b join pim.artikel v on v.id = b.von_artikel_id
+           join pim.artikel z on z.id = b.zu_artikel_id
+           left join pim.artikel_text t on t.artikel_id = z.id and t.art = 'titel' and t.sprache = 'en'
+          where v.artikelnummer_norm = '011H1300' order by b.position limit 20"""),
+     ("Austausch Wilo Star E 25/1-3",
+      """select w.hersteller_name, w.fremdtyp, a.artikelnummer, al.wert, w.variante, w.kommentar
+           from pim.querverweis_wettbewerb w join pim.artikel a on a.id = w.artikel_id
+           left join pim.artikel_alias al on al.artikel_id = a.id and al.typ = 'typbezeichnung'
+          where w.fremdtyp ilike '%Star%E 25%1-3%' order by w.variante limit 15"""),
+     ("Hersteller im Austauschfinder",
+      """select coalesce(hersteller_name, fremdhersteller), count(distinct fremdtyp) typen, count(*) vorschlaege
+           from pim.querverweis_wettbewerb group by 1 order by 3 desc limit 30""")],
+)
+
+# ── Import 3: GPC-Datenordner 2023 → Schema gpc2023 ──
+gpc_code = (here / "gpc_dateien_import.py").read_text(encoding="utf-8")
+cells5 = [
+    md("""
+# Grundfos-PIM – Import 3: Daten der Grundfos-Software 2023 → Supabase
+
+Lädt den kompletten Ordner *02 Grundfos / GRUNDFOS SOFTWARE X SHOPIFY / GPC* in das Schema `gpc2023`:
+
+- **Texte zeilenweise**: HybrisQt-Produkttexte in 27 Sprachen, Sprachpakete `ctf`, `QtTxt`,
+  Länder-Sortimente 2023 (`ProductRange_*`), Zubehör- und Austauschregeln, Produktmodelle (`*.vtz`), entpackte Caches
+- **Bilder, Zeichnungen, PDFs**: nur verzeichnet (Name, Pfad, Größe) – für die spätere Zuordnung
+- Programmdateien werden **nicht** gestartet; Inhalte aus `bin` und `*.config` werden nicht gespeichert
+
+Jede Datei ist ein eigener Schritt – bricht etwas ab, einfach neu starten: Erledigtes wird übersprungen.
+Voraussetzung: Secret `SUPABASE_DB_URL`. **Laufzeit → Alle ausführen.** Dauer ca. 20–60 Minuten.
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip -q install "psycopg[binary]>=3.1"
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/gpc_dateien_import.py\n" + gpc_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, gpc_dateien_import
+for m in (datenaudit, datanorm_import, gpc_dateien_import): importlib.reload(m)
+gpc_dateien_import.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+(here / "Import_GPC2023_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells5), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_GPC2023_Colab.ipynb")
