@@ -153,18 +153,21 @@ nb3 = dict(nb, cells=cells3)
 (here / "Access_Datenbanken_Colab.ipynb").write_text(json.dumps(nb3, ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Access_Datenbanken_Colab.ipynb")
 
-# ── ZIP-Inventar „Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015“ ──
+# ── Inventar: historische GF-Daten 2015 + Sprachpakete der GPC-Software ──
 code_zip = (here / "zip_inventar.py").read_text(encoding="utf-8")
 cells4 = [
     md("""
-# Grundfos – Inventar „Historische Grundfos-Daten 2015“ (GF_*.zip)
+# Grundfos – Inventar Stammdaten 2015 und Sprachpakete
 
-**Liest nur.** Öffnet die ZIP-Archive im Ordner *GRUNDFOS – Zentrale Projektablage /
-Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015* und listet je Datei Spalten und Beispielzeilen –
-vor allem: **Welche Sprachen sind enthalten?** Bilder werden nur gezählt, `gf.exe` wird nicht geöffnet.
+**Liest nur.** Öffnet die ZIP-Archive und listet je Datei Spalten und Beispielzeilen,
+vor allem: **Welche Sprachen sind enthalten?** Bilder werden nur gezählt, EXE-Dateien werden nicht geöffnet.
+
+1. *GRUNDFOS – Zentrale Projektablage / Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015* (GF_*.zip)
+2. *02 Grundfos / GRUNDFOS SOFTWARE X SHOPIFY / GPC / datafile / ctf*: Sprachpakete der Software (DEU, ENU, FRA …)
+3. *… / GPC / datafile / QtTxt*: Text- und Konfigurationslisten
 
 **Laufzeit → Alle ausführen**, Drive-Zugriff erlauben. Dauer ca. 5–10 Minuten.
-Ergebnis: `02 Grundfos/00_Datenaudit/ergebnis_gf2015/30_zip_inventar.md`.
+Ergebnis: `02 Grundfos/00_Datenaudit/ergebnis_sprachen/`.
 """),
     py("""
 from google.colab import drive
@@ -173,8 +176,13 @@ drive.mount('/content/drive')
     py("""
 import glob, os
 ROOT = '/content/drive/MyDrive'
-ORDNER = [os.path.relpath(p, ROOT) for p in glob.glob(ROOT + '/*/Historische Grundfos-Daten*')]
-print(ORDNER or 'Ordner nicht gefunden – bitte Pfad manuell eintragen')
+ORDNER = {
+    '30_gf2015.md': glob.glob(ROOT + '/*/Historische Grundfos-Daten*'),
+    '31_gpc_ctf_sprachen.md': glob.glob(ROOT + '/02 Grundfos/GRUNDFOS SOFTWARE X SHOPIFY/GPC/datafile/ctf'),
+    '32_gpc_qttxt.md': glob.glob(ROOT + '/02 Grundfos/GRUNDFOS SOFTWARE X SHOPIFY/GPC/datafile/QtTxt'),
+}
+for k, v in ORDNER.items():
+    print(('OK   ' if v else 'FEHLT'), k, v[:1])
 """),
     py("%%writefile /content/datenaudit.py\n" + code),
     py("%%writefile /content/zip_inventar.py\n" + code_zip),
@@ -183,10 +191,13 @@ import sys, importlib
 sys.path.insert(0, '/content')
 import datenaudit, zip_inventar
 importlib.reload(datenaudit); importlib.reload(zip_inventar)
-zip_inventar.run(ROOT, ORDNER[0])
+for name, pfade in ORDNER.items():
+    if pfade:
+        zip_inventar.run(ROOT, os.path.relpath(pfade[0], ROOT),
+                         output_dir='02 Grundfos/00_Datenaudit/ergebnis_sprachen', name=name)
 """),
     md("## Fertig – Claude kurz Bescheid geben."),
 ]
 nb4 = dict(nb, cells=cells4)
-(here / "GF2015_Inventar_Colab.ipynb").write_text(json.dumps(nb4, ensure_ascii=False, indent=1), encoding="utf-8")
-print("geschrieben:", here / "GF2015_Inventar_Colab.ipynb")
+(here / "Sprachen_Inventar_Colab.ipynb").write_text(json.dumps(nb4, ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Sprachen_Inventar_Colab.ipynb")

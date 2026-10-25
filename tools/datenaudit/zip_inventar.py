@@ -2,8 +2,9 @@
 """
 Inventar von ZIP-Archiven (nur lesen): Inhalt, Dateitypen, Kopfzeilen und Beispielzeilen.
 
-Gedacht für „Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015“ (GF_*.zip):
-Welche Datei enthält welche Spalten – und welche Sprachen?
+Gedacht für „Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015“ (GF_*.zip) und die
+Sprachpakete der Grundfos-Software (GPC/datafile/ctf/*.zip, QtTxt): Welche Datei enthält welche
+Spalten – und welche Sprachen?
 Bilder werden nur gezählt. Ergebnis: eine Markdown-Datei im Ausgabeordner.
 """
 
@@ -96,8 +97,16 @@ def run(root, ordner, output_dir="02 Grundfos/00_Datenaudit/ergebnis_gf2015", na
     lines = [f"# ZIP-Inventar: {ordner}", ""]
     for fname in sorted(os.listdir(base)):
         path = os.path.join(base, fname)
+        if os.path.isdir(path):
+            continue
         if not fname.lower().endswith(".zip"):
-            lines.append(f"## {fname} ({human(os.path.getsize(path))}) – keine ZIP, nicht geöffnet\n")
+            if fname.lower().endswith((".txt", ".csv", ".xml", ".json")) and os.path.getsize(path) < 50 * 1024 * 1024:
+                lines.append(f"## {fname}")
+                with open(path, "rb") as fh:
+                    text_probe(fname, fh.read(), lines, n=5)
+                lines.append("")
+            else:
+                lines.append(f"## {fname} ({human(os.path.getsize(path))}) – nicht geöffnet\n")
             continue
         log(f"lese {fname} …")
         lines.append(f"## {fname} ({human(os.path.getsize(path))})")
