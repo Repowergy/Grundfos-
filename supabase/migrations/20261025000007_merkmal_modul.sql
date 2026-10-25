@@ -208,8 +208,8 @@ begin
   if v_stand > v_ziel and not v_fertig then
     update pim.job_fortschritt set fertig = true, aktualisiert = now(), meldung = 'fertig' where job = 'gpi_merkmale';
     commit;
-    create index if not exists artikel_merkmal_code_num_idx on pim.artikel_merkmal (merkmal_code, wert_num)
-      where wert_num is not null;
+    -- Filter-Index separat bauen (globales statement_timeout 120 s gilt für den ganzen CALL):
+    --   set statement_timeout = 0; create index artikel_merkmal_code_num_idx on pim.artikel_merkmal (merkmal_code, wert_num) where wert_num is not null;
     perform cron.unschedule(jobid) from cron.job where jobname = 'gpi_merkmale';
     commit;
   end if;

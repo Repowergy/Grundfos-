@@ -92,7 +92,7 @@ select a.id, a.artikelnummer, a.ean, a.status, a.hersteller_url,
   left join lateral (
     select p.betrag, p.waehrung, p.preiseinheit, q.datenstand
       from pim.artikel_preis p join pim.quelle q on q.id = p.quelle_id
-     where p.artikel_id = a.id and p.preisart = 'listenpreis'
+     where p.artikel_id = a.id and p.preisart = 'listenpreis' and p.markt = 'DE'
      order by q.datenstand desc nulls last, q.prioritaet desc limit 1
   ) pr on true;
 
