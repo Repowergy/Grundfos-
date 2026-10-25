@@ -163,10 +163,12 @@ cells4 = [
 vor allem: **Welche Sprachen sind enthalten?** Bilder werden nur gezählt, EXE-Dateien werden nicht geöffnet.
 
 1. *GRUNDFOS – Zentrale Projektablage / Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015* (GF_*.zip)
-2. *02 Grundfos / GRUNDFOS SOFTWARE X SHOPIFY / GPC / datafile / ctf*: Sprachpakete der Software (DEU, ENU, FRA …)
-3. *… / GPC / datafile / QtTxt*: Text- und Konfigurationslisten
+2. *02 Grundfos / GRUNDFOS SOFTWARE X SHOPIFY / GPC / datafile* (Stand 09/2023) mit allen Unterordnern:
+   Sprachpakete `ctf` (DEU, ENU, FRA …), `QtTxt`, Länder-Sortimente `Control/ProductRange`, Zubehör- und
+   Austauschregeln, Produktmodelle `vt/*.vtz`, Bilder/Zeichnungen (nur gezählt), Caches.
+   Anleitungen (`InstOper`, `Service`) und `Log` werden ausgelassen.
 
-**Laufzeit → Alle ausführen**, Drive-Zugriff erlauben. Dauer ca. 5–10 Minuten.
+**Laufzeit → Alle ausführen**, Drive-Zugriff erlauben. Dauer ca. 10–20 Minuten.
 Ergebnis: `02 Grundfos/00_Datenaudit/ergebnis_sprachen/`.
 """),
     py("""
@@ -178,8 +180,7 @@ import glob, os
 ROOT = '/content/drive/MyDrive'
 ORDNER = {
     '30_gf2015.md': glob.glob(ROOT + '/*/Historische Grundfos-Daten*'),
-    '31_gpc_ctf_sprachen.md': glob.glob(ROOT + '/02 Grundfos/GRUNDFOS SOFTWARE X SHOPIFY/GPC/datafile/ctf'),
-    '32_gpc_qttxt.md': glob.glob(ROOT + '/02 Grundfos/GRUNDFOS SOFTWARE X SHOPIFY/GPC/datafile/QtTxt'),
+    '31_gpc_datafile_2023.md': glob.glob(ROOT + '/02 Grundfos/GRUNDFOS SOFTWARE X SHOPIFY/GPC/datafile'),
 }
 for k, v in ORDNER.items():
     print(('OK   ' if v else 'FEHLT'), k, v[:1])
@@ -194,7 +195,8 @@ importlib.reload(datenaudit); importlib.reload(zip_inventar)
 for name, pfade in ORDNER.items():
     if pfade:
         zip_inventar.run(ROOT, os.path.relpath(pfade[0], ROOT),
-                         output_dir='02 Grundfos/00_Datenaudit/ergebnis_sprachen', name=name)
+                         output_dir='02 Grundfos/00_Datenaudit/ergebnis_sprachen', name=name,
+                         rekursiv=name.startswith('31'))
 """),
     md("## Fertig – Claude kurz Bescheid geben."),
 ]

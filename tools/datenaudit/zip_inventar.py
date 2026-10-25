@@ -90,32 +90,56 @@ def inventar_zip(label, zf, out, tiefe=0):
             out.append(f"  - `{i.filename}` · {human(i.file_size)}")
 
 
-def run(root, ordner, output_dir="02 Grundfos/00_Datenaudit/ergebnis_gf2015", name="30_zip_inventar.md"):
-    base = os.path.join(root, ordner)
-    out_dir = os.path.join(root, output_dir)
-    os.makedirs(out_dir, exist_ok=True)
-    lines = [f"# ZIP-Inventar: {ordner}", ""]
-    for fname in sorted(os.listdir(base)):
-        path = os.path.join(base, fname)
-        if os.path.isdir(path):
-            continue
-        if not fname.lower().endswith(".zip"):
-            if fname.lower().endswith((".txt", ".csv", ".xml", ".json")) and os.path.getsize(path) < 50 * 1024 * 1024:
-                lines.append(f"## {fname}")
-                with open(path, "rb") as fh:
-                    text_probe(fname, fh.read(), lines, n=5)
-                lines.append("")
-            else:
-                lines.append(f"## {fname} ({human(os.path.getsize(path))}) – nicht geöffnet\n")
-            continue
+def probe_datei(path, fname, lines, rest):
+    """Eine Datei außerhalb eines Archivs untersuchen; Unbekanntes nur zählen."""
+    size = os.path.getsize(path)
+    low = fname.lower()
+    if zipfile.is_zipfile(path):  # auch .vtz u. ä.
         log(f"lese {fname} …")
-        lines.append(f"## {fname} ({human(os.path.getsize(path))})")
+        lines.append(f"## {fname} ({human(size)})")
         try:
             with zipfile.ZipFile(path) as zf:
                 inventar_zip(fname, zf, lines)
         except zipfile.BadZipFile:
             lines.append("- beschädigt / keine gültige ZIP")
         lines.append("")
+        return
+    with open(path, "rb") as fh:
+        head = fh.read(2)
+    if head == b"\x1f\x8b" and size < 200 * 1024 * 1024:  # gzip, z. B. *.cache
+        import gzip
+        with gzip.open(path, "rb") as fh:
+            data = fh.read()
+        lines.append(f"## {fname} (gzip, {human(size)} → {human(len(data))})")
+        text_probe(fname, data, lines, n=3)
+        lines.append("")
+    elif low.endswith((".txt", ".csv", ".xml", ".json", ".ini")) and size < 50 * 1024 * 1024:
+        lines.append(f"## {fname}")
+        with open(path, "rb") as fh:
+            text_probe(fname, fh.read(), lines, n=5)
+        lines.append("")
+    else:
+        rest[os.path.splitext(low)[1] or "(ohne)"] += 1
+
+
+def run(root, ordner, output_dir="02 Grundfos/00_Datenaudit/ergebnis_gf2015", name="30_zip_inventar.md",
+        rekursiv=False, auslassen=("InstOper", "Service", "Log")):
+    base = os.path.join(root, ordner)
+    out_dir = os.path.join(root, output_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    lines = [f"# Inventar: {ordner}", ""]
+    for dp, dn, fn in os.walk(base):
+        dn[:] = sorted(d for d in dn if d not in auslassen) if rekursiv else []
+        rel = os.path.relpath(dp, base)
+        if rel != ".":
+            lines.append(f"# Ordner `{rel}`\n")
+        rest = collections.Counter()
+        for fname in sorted(fn):
+            probe_datei(os.path.join(dp, fname), fname, lines, rest)
+        if rest:
+            lines.append("Weitere Dateien (nicht geöffnet): " + ", ".join(f"{e} {c}" for e, c in rest.most_common()) + "\n")
+    if rekursiv:
+        lines.append("Ausgelassene Ordner: " + ", ".join(auslassen))
     with open(os.path.join(out_dir, name), "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
     log(f"FERTIG → {os.path.join(out_dir, name)}")
