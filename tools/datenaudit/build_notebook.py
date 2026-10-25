@@ -152,3 +152,41 @@ datenaudit2.run_datenbanken(ROOT, DB_DIRS)
 nb3 = dict(nb, cells=cells3)
 (here / "Access_Datenbanken_Colab.ipynb").write_text(json.dumps(nb3, ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Access_Datenbanken_Colab.ipynb")
+
+# ── ZIP-Inventar „Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015“ ──
+code_zip = (here / "zip_inventar.py").read_text(encoding="utf-8")
+cells4 = [
+    md("""
+# Grundfos – Inventar „Historische Grundfos-Daten 2015“ (GF_*.zip)
+
+**Liest nur.** Öffnet die ZIP-Archive im Ordner *GRUNDFOS – Zentrale Projektablage /
+Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015* und listet je Datei Spalten und Beispielzeilen –
+vor allem: **Welche Sprachen sind enthalten?** Bilder werden nur gezählt, `gf.exe` wird nicht geöffnet.
+
+**Laufzeit → Alle ausführen**, Drive-Zugriff erlauben. Dauer ca. 5–10 Minuten.
+Ergebnis: `02 Grundfos/00_Datenaudit/ergebnis_gf2015/30_zip_inventar.md`.
+"""),
+    py("""
+from google.colab import drive
+drive.mount('/content/drive')
+"""),
+    py("""
+import glob, os
+ROOT = '/content/drive/MyDrive'
+ORDNER = [os.path.relpath(p, ROOT) for p in glob.glob(ROOT + '/*/Historische Grundfos-Daten*')]
+print(ORDNER or 'Ordner nicht gefunden – bitte Pfad manuell eintragen')
+"""),
+    py("%%writefile /content/datenaudit.py\n" + code),
+    py("%%writefile /content/zip_inventar.py\n" + code_zip),
+    py("""
+import sys, importlib
+sys.path.insert(0, '/content')
+import datenaudit, zip_inventar
+importlib.reload(datenaudit); importlib.reload(zip_inventar)
+zip_inventar.run(ROOT, ORDNER[0])
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+nb4 = dict(nb, cells=cells4)
+(here / "GF2015_Inventar_Colab.ipynb").write_text(json.dumps(nb4, ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "GF2015_Inventar_Colab.ipynb")
