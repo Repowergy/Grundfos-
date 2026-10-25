@@ -292,3 +292,38 @@ gpc_dateien_import.run('/content/drive/MyDrive')
 ]
 (here / "Import_GPC2023_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells5), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_GPC2023_Colab.ipynb")
+
+# ── Import 4: Grundfos-Stammdaten 2015 (ARGE) → raw.tabellen_zeile ──
+arge_code = (here / "arge_import.py").read_text(encoding="utf-8")
+cells6 = [
+    md("""
+# Grundfos-PIM – Import 4: Grundfos-Stammdaten 2015 (ARGE) → Supabase
+
+Liest die ZIP-Dateien im Ordner *GRUNDFOS – Zentrale Projektablage / Historische Grundfos-Daten – Stammdaten, Bilder, EOL 2015*
+und speichert jede Tabelle zeilenweise in Supabase (`raw.tabellen_zeile`):
+Artikel mit **Nachfolgern 1–3**, Baujahr, Ersatzteilliste, Link · Bild- und Dokumentzuordnungen · Abmessungen/Gewichte ·
+Langtexte · Warengruppen · Auslauf-/Neuartikel-/Kit-/VPE-Listen 2015. Bilder werden nur verzeichnet.
+
+Nur lesen, nichts wird verändert. Bereits importierte Dateien werden übersprungen.
+Voraussetzung: Secret `SUPABASE_DB_URL`. **Laufzeit → Alle ausführen.** Dauer ca. 5 Minuten.
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip -q install "psycopg[binary]>=3.1" openpyxl
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/arge_import.py\n" + arge_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, arge_import
+for m in (datenaudit, datanorm_import, arge_import): importlib.reload(m)
+arge_import.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+(here / "Import_Stammdaten2015_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells6), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_Stammdaten2015_Colab.ipynb")
