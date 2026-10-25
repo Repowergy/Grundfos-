@@ -8,7 +8,7 @@
 create materialized view if not exists pim.artikel_qualitaet as
 with m as (select artikel_id, count(*) as merkmale from pim.artikel_merkmal group by 1),
      t as (select artikel_id,
-                  bool_or(art in ('kurz1', 'kurz2') and sprache = 'de') as kurztext,
+                  bool_or(art in ('kurz1', 'kurz2', 'titel') and sprache = 'de') as kurztext,   -- Titel der Grundfos-Website zählt
                   bool_or(art = 'lang' and sprache = 'de') as langtext,
                   bool_or(art = 'technik' and sprache = 'de') as techniktext,
                   count(distinct sprache) filter (where sprache not in ('-')) as sprachen
@@ -31,7 +31,7 @@ select a.id as artikel_id, a.status,
        coalesce(b.dokument, false) or gd.artikel_id is not null as dokument,
        el.artikel_id is not null as hat_ersatzteilliste, et.artikel_id is not null as ist_ersatzteil,
        ty.artikel_id is not null as typbezeichnung, ws.artikel_id is not null as austausch_ziel,
-       a.hersteller_url is not null as hersteller_link,
+       a.hersteller_url is not null as hersteller_link, a.kategorie_id is not null as kategorie,
        ( 15 * (p.artikel_id is not null)::int
        + 10 * (a.ean is not null)::int
        + 15 * coalesce(t.kurztext, false)::int
@@ -42,7 +42,8 @@ select a.id as artikel_id, a.status,
        + 10 * (coalesce(b.dokument, false) or gd.artikel_id is not null)::int
        +  5 * (ty.artikel_id is not null)::int
        +  5 * (el.artikel_id is not null or et.artikel_id is not null)::int
-       +  5 * (a.hersteller_url is not null)::int ) as punkte
+       +  3 * (a.hersteller_url is not null)::int
+       +  2 * (a.kategorie_id is not null)::int ) as punkte
   from pim.artikel a
   left join m on m.artikel_id = a.id
   left join t on t.artikel_id = a.id
