@@ -44,7 +44,7 @@ Das ist die Quelle für die **Verlinkungen**:
 | Bereich | Tabellen (Zeilen) | Nutzen für den Shop |
 |---|---|---|
 | Produkte | `Products2` (427.538: Nummer, EAN, Produktgruppe, 50/60 Hz, Status, Typname, 88 Datenspalten), `Prodnames` (60.289), `PG` (1.351 Produktgruppen mit Beschreibung), `ColText` (133.505 Werte) | Artikel, EAN, Typbezeichnung, technische Daten |
-| Merkmalskatalog | `DL` (2.438 Merkmale mit Name, Beschreibung, Einheit), `DLPoss`, `Domain`, `Clas` | sprachneutrale Merkmale (Kap. 3.2), Filter |
+| Merkmalskatalog | `DL` (2.438 Merkmale mit Name, Beschreibung, Einheit), `DLPoss`, `Domain`, `Clas` | sprachneutrale Merkmale (Kap. 4.2), Filter |
 | **Ersatzteile** | `Master` (391.683 Teile), `PartList` (**7.042.649** Stücklistenzeilen), `PartDetails` (198.371: Menge, Position), `PartValidity` (2.032 Gültigkeitszeiträume), `ChangeNote` (853), `PLText` (3.305 Teilebezeichnungen), `BULKS`, `PACKAGINGNUMBERS` (10.841) | Ersatzteil je Pumpe **mit Positionsnummer und Produktionszeitraum** |
 | Zeichnungen & Dokumente | `PartDrawingLink` (446.639), `DF` (15.897 Dateien mit Sprache), `ProdDF`, `IT`/`ITDF` (Infobaum), `Literature` (5.816), `LiteratureFile` (32.379, **je Sprache**), `LiteraturePGLink` (20.088) | Explosionszeichnung, Datenblatt, Anleitung je Artikel/Sprache |
 | Zubehör | `ACCLINK` (32.149) | Zubehör je Pumpe |
@@ -95,33 +95,33 @@ Andere Shops übersetzen Texte. Wir speichern **Fakten sprachneutral** und erzeu
 
 ---
 
-## 3. Bausteine
+## 4. Bausteine
 
-### 3.1 Sprache und Markt getrennt
+### 4.1 Sprache und Markt getrennt
 - **Locale** = Sprache + Region: `de-DE`, `de-AT`, `de-CH`, `fr-CH`, `it-CH`, `en-GB` …
 - **Markt** = Land mit Währung, Steuer, Sortiment und Preisen: `DE`, `AT`, `CH`.
 - Eine Sprache kann in mehreren Märkten gelten, und ein Markt kann mehrere Sprachen haben (CH: de/fr/it).
 - **Fallback-Kette** je Locale, z. B. `de-AT → de-DE → de` und `fr-CH → fr-FR → fr → en`. Fehlt ein Text in Österreich, wird der deutsche verwendet. Das Feld bleibt nie leer.
 
-### 3.2 Merkmale als Zahl mit Einheit (ETIM-fähig)
+### 4.2 Merkmale als Zahl mit Einheit (ETIM-fähig)
 - Der D-Satz `Unilift KP 150 M 1$300$8$1 x 220-230$` wird zu einzelnen Merkmalen: `typ=KP 150 M1`, `foerderhoehe_max=8 m`, `spannung=1x220-230 V`.
 - Jedes Merkmal hat Code, Datentyp, Einheit, Übersetzungen und optional eine ETIM-Klasse.
 - Damit funktionieren **Filter** (Förderhöhe ≥ 8 m), **Vergleiche**, die **Austauschsuche** („gleiche Einbaulänge 180 mm, 1x230 V“) und Google-Shopping-Attribute.
 
-### 3.3 Texte aus Vorlagen erzeugen
+### 4.3 Texte aus Vorlagen erzeugen
 - Je Produkttyp und Sprache gibt es eine Vorlage, z. B. `Max. Förderhöhe: {foerderhoehe_max} m` bzw. `Max. head: {foerderhoehe_max} m`.
 - Der Techniktext entsteht für **jede Sprache automatisch und fehlerfrei aus den Merkmalen**. Zahlen werden nie übersetzt und können deshalb nicht falsch werden.
 - Fließtexte (Langtext, Vorteile, SEO) kommen aus offiziellen Quellen: DATANORM DE, die mehrsprachige Grundfos-Datei 2016, GPC-Sprachtabellen (33 Sprachen). Was fehlt, wird maschinell übersetzt und als `maschinell` markiert, bis jemand es prüft.
 
-### 3.4 Status je Text
+### 4.4 Status je Text
 `quelle` (offiziell) · `maschinell` · `geprueft` · `gesperrt`. In den Shop gehen nur geprüfte oder offizielle Texte. Maschinelle Texte kommen nur mit Freigabe in den Shop.
 
-### 3.5 „Golden Record“ mit Herkunft
+### 4.5 „Golden Record“ mit Herkunft
 - Jeder Wert behält seine Quelle, Priorität und seinen Datenstand.
 - Eine Ansicht `pim.v_artikel_<locale>` wählt je Feld automatisch den besten Wert: höchste Priorität, dann neuester Stand, dann geprüft.
 - Neue Quellen (aktuelle DATANORM, BMEcat von Grundfos) verbessern so automatisch den Shop, ohne dass etwas überschrieben wird.
 
-### 3.6 Identitäten und Querverweise
+### 4.6 Identitäten und Querverweise
 - **Alias** je Artikel: EAN, alte Nummern, Großhändler-Nummern, Typbezeichnung in Schreibvarianten („UPS25-60“, „UPS 25-60 180“).
 - **Querverweise** mit Status `Kandidat / geprüft` und Nachweis:
   - Nachfolger (UPS → ALPHA1 GO);
@@ -130,19 +130,19 @@ Andere Shops übersetzen Texte. Wir speichern **Fakten sprachneutral** und erzeu
   - Reparatursatz;
   - Zubehör.
 
-### 3.7 Intelligente Suche
+### 4.7 Intelligente Suche
 - **Fehlertolerant** über Trigramme für Typbezeichnungen und Nummern; bereits angelegt.
 - **Synonyme je Sprache**, z. B. Heizungspumpe = Umwälzpumpe = Nassläufer = circulator = circulateur.
 - **Semantische Suche** mit Vektoren (pgvector in Supabase). Sie versteht Anfragen wie „Pumpe für 30 m tiefen Brunnen 230 V“ oder „pompe puits 30 m“ in jeder Sprache und schlägt passende Pumpen vor.
 - **Typenschild-Erkennung** später: Foto → OCR → Alias-Suche → passender Artikel bzw. Nachfolger.
 
-### 3.8 Qualitäts-Score je Artikel und Markt
+### 4.8 Qualitäts-Score je Artikel und Markt
 - Punkte für Preis, EAN, Bild, Langtext, Merkmale, Dokument, Übersetzung, Beziehungen.
 - Der Shop-Export nimmt nur Artikel ab einer Mindestpunktzahl. Ein Dashboard zeigt, wo Daten fehlen. Das ist die Arbeitsliste für die Datenpflege.
 
 ---
 
-## 4. Erweiterungen am Schema (Vorschlag)
+## 5. Erweiterungen am Schema (Vorschlag)
 
 | Tabelle / Objekt | Zweck |
 |---|---|
@@ -159,7 +159,7 @@ Andere Shops übersetzen Texte. Wir speichern **Fakten sprachneutral** und erzeu
 
 ---
 
-## 5. Offene Entscheidungen
+## 6. Offene Entscheidungen
 
 1. **Großhändler-Datei 09/2025:**
    - Sollen die **1.190 zusätzlichen Artikel** als Grundfos-Artikel übernommen werden (Nummer, Bezeichnung, EAN falls vorhanden)?
