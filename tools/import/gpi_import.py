@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-Grundfos-PIM – Import 2: GPC-Datenbank gpi.mdb (Grundfos Product Center, Export 10.10.2015) → Supabase
+Grundfos-PIM – Import 2: Access-Datenbanken → Supabase (Grundsatz: nichts wegwerfen)
 
-Die Access-Datenbank wird 1:1 in das Schema `gpi` übernommen: jede Tabelle, jede Zeile,
+  gpi.mdb  (Grundfos Product Center, Export 10.10.2015) → Schema `gpi`
+  ETB.MDB  (Ersatzteil-Datenbank eines Fremdherstellers, KSB-Baureihen) → Schema `etb`
+           nur als Rohdaten; geht NICHT in den Grundfos-Stamm (pim)
+
+Jede Datenbank wird 1:1 übernommen: jede Tabelle, jede Zeile,
 alle Spalten als Text (leere Felder = NULL). Umwandlung in pim.* (Artikel, Ersatzteillisten,
 Dokumente, Wettbewerber-Austausch, Kennlinien) folgt danach per SQL – so bleibt die Quelle
 unverändert und jeder Schritt nachvollziehbar.
 
-Alles läuft in einer Transaktion: bricht etwas ab, bleibt die Datenbank unverändert.
+Je Datenbank eine Transaktion: bricht etwas ab, bleibt die Datenbank unverändert.
 Eine bereits importierte Datei (gleiche SHA-256) wird übersprungen.
 
 Voraussetzungen: mdbtools (apt-get install mdbtools), psycopg 3, Secret SUPABASE_DB_URL.
@@ -31,8 +35,7 @@ from psycopg import sql
 from datanorm_import import conn_params, db_url, new_quelle, register_file
 from datenaudit import log
 
-SCHEMA = "gpi"
-DATENSTAND = "2015-10-10"   # Tabelle ExtrDates: DB2015.10.10
+DATENSTAND = "2015-10-10"   # gpi.mdb, Tabelle ExtrDates: DB2015.10.10
 csv.field_size_limit(sys.maxsize)
 
 # Schlüsselspalten, die später für Verknüpfungen gebraucht werden (Tabelle → Spalten, klein geschrieben)
@@ -62,7 +65,21 @@ INDEXE = {
     "productelectricalvariation": ["productnumber"],
     "competitorproducts": ["id"],
     "competitorproductdata": ["productid"],
+    # ETB.MDB
+    "teileliste": ["identnummer", "teilenummer"],
+    "teilestamm": ["identnr"],
+    "variante": ["zeichnung"],
+    "zeichnung": ["zeichnung"],
+    "idnrhist": ["idnr_alt", "idnr_neu"],
 }
+
+# Datenbanken: Dateiname, Schema, Lieferant, Datenstand, Beschreibung, pim.quelle (typ, prio) oder None
+DATENBANKEN = [
+    ("gpi.mdb", "gpi", "GRUNDFOS", DATENSTAND,
+     "Grundfos Product Center (GPC) – gpi.mdb, Export 10.10.2015", ("gpc", 75)),
+    ("ETB.MDB", "etb", "KSB (Fremdhersteller)", None,
+     "ETB.MDB – Ersatzteil-Datenbank KSB-Baureihen (Preise DM); nur Rohdaten, nicht im Grundfos-Stamm", None),
+]
 
 
 def ident(name, used=None):
@@ -82,16 +99,14 @@ def mdb(*args, timeout=900):
                           encoding="utf-8", errors="replace").stdout
 
 
-def find_gpi(root):
-    treffer = sorted(glob.glob(os.path.join(root, "*", "Historische Grundfos-Software*", "gpi.mdb")) +
-                     glob.glob(os.path.join(root, "*", "*", "Historische Grundfos-Software*", "gpi.mdb")))
-    if not treffer:
-        raise SystemExit("gpi.mdb nicht gefunden – Pfad bitte als Argument angeben.")
-    return treffer[0]
+def find_db(root, dateiname):
+    treffer = sorted(glob.glob(os.path.join(root, "*", "Historische Grundfos-Software*", dateiname)) +
+                     glob.glob(os.path.join(root, "*", "*", "Historische Grundfos-Software*", dateiname)))
+    return treffer[0] if treffer else None
 
 
-def import_table(cur, path, table):
-    """Eine Access-Tabelle per mdb-export (CSV) streamen und mit COPY nach gpi.<tabelle> schreiben."""
+def import_table(cur, path, table, schema, label):
+    """Eine Access-Tabelle per mdb-export (CSV) streamen und mit COPY nach <schema>.<tabelle> schreiben."""
     err = tempfile.TemporaryFile(mode="w+")  # stderr in Datei, damit die Pipe nie blockiert
     proc = subprocess.Popen(["mdb-export", "-b", "strip", "-D", "%Y-%m-%d %H:%M:%S", path, table],
                             stdout=subprocess.PIPE, stderr=err, text=True,
@@ -106,13 +121,13 @@ def import_table(cur, path, table):
     used = set()
     cols = [ident(c, used) for c in header]
     tname = ident(table)
-    cur.execute(f'drop table if exists {SCHEMA}."{tname}"')
-    cur.execute(f'create table {SCHEMA}."{tname}" (' + ", ".join(f'"{c}" text' for c in cols) + ")")
-    cur.execute(f'alter table {SCHEMA}."{tname}" enable row level security')
+    cur.execute(f'drop table if exists {schema}."{tname}"')
+    cur.execute(f'create table {schema}."{tname}" (' + ", ".join(f'"{c}" text' for c in cols) + ")")
+    cur.execute(f'alter table {schema}."{tname}" enable row level security')
     cur.execute(sql.SQL("comment on table {}.{} is {}").format(
-        sql.Identifier(SCHEMA), sql.Identifier(tname), sql.Literal(f"gpi.mdb · {table} · Stand {DATENSTAND}")))
+        sql.Identifier(schema), sql.Identifier(tname), sql.Literal(f"{label} · Tabelle {table}")))
     n, w = 0, len(cols)
-    with cur.copy(f'COPY {SCHEMA}."{tname}" ({", ".join(chr(34) + c + chr(34) for c in cols)}) FROM STDIN') as cp:
+    with cur.copy(f'COPY {schema}."{tname}" ({", ".join(chr(34) + c + chr(34) for c in cols)}) FROM STDIN') as cp:
         for row in reader:
             if len(row) != w:
                 row = (row + [""] * w)[:w]
@@ -125,52 +140,61 @@ def import_table(cur, path, table):
     return tname, cols, n
 
 
-def run(root="/content/drive/MyDrive", gpi_path=None, cache_dir="/content/mdb_cache"):
+def import_db(root, src, schema, lieferant, datenstand, beschreibung, quelle, cache_dir):
     t0 = time.time()
-    src = gpi_path or find_gpi(root)
     rel = os.path.relpath(src, root)
+    name = os.path.basename(src)
     os.makedirs(cache_dir, exist_ok=True)
-    local = os.path.join(cache_dir, "gpi.mdb")
+    local = os.path.join(cache_dir, name)
     if not os.path.exists(local) or os.path.getsize(local) != os.path.getsize(src):
         log(f"kopiere {rel} ({os.path.getsize(src) / 1e9:.2f} GB) …")
         shutil.copyfile(src, local)
     tables = [t for t in mdb("mdb-tables", "-1", local).split("\n") if t.strip()]
-    log(f"{len(tables)} Tabellen in gpi.mdb")
+    log(f"{name}: {len(tables)} Tabellen → Schema {schema}")
 
     with psycopg.connect(**conn_params(db_url()), autocommit=False) as con, con.cursor() as cur:
         cur.execute("set statement_timeout = 0")
         cur.execute("insert into raw.import_lauf (werkzeug, notiz) values (%s, %s) returning id",
-                    ("gpi_import v1", "GPC-Datenbank gpi.mdb → Schema gpi (1:1)"))
+                    ("gpi_import v2", f"{name} → Schema {schema} (1:1)"))
         lauf_id = cur.fetchone()[0]
-        datei_id = register_file(cur, lauf_id, local, rel, "mdb", "GRUNDFOS", DATENSTAND,
-                                 "Grundfos Product Center (GPC) – gpi.mdb, Export 10.10.2015")
+        datei_id = register_file(cur, lauf_id, local, rel, "mdb", lieferant, datenstand, beschreibung)
         if datei_id is None:
-            log("gpi.mdb ist bereits importiert – nichts zu tun.")
+            log(f"{name} ist bereits importiert – nichts zu tun.")
             con.rollback()
             return
-        cur.execute(f"create schema if not exists {SCHEMA}")
-        cur.execute(f"revoke all on schema {SCHEMA} from anon, authenticated")
-        cur.execute(sql.SQL("comment on schema {} is {}").format(sql.Identifier(SCHEMA), sql.Literal(
-            "Rohdaten 1:1 aus gpi.mdb (Grundfos Product Center, Stand 10.10.2015); nur lesen")))
+        cur.execute(f"create schema if not exists {schema}")
+        cur.execute(f"revoke all on schema {schema} from anon, authenticated")
+        cur.execute(sql.SQL("comment on schema {} is {}").format(sql.Identifier(schema), sql.Literal(
+            f"Rohdaten 1:1 aus {beschreibung}; nur lesen")))
         bericht, gesamt = [], 0
         for t in tables:
             soll = mdb("mdb-count", local, t).strip()
             t1 = time.time()
-            tname, cols, n = import_table(cur, local, t)
+            tname, cols, n = import_table(cur, local, t, schema, name)
             gesamt += n
             ok = "" if soll == str(n) else f"  ⚠ mdb-count {soll}"
             bericht.append((t, n, ok))
             log(f"  {t:<34} {n:>9} Zeilen  {time.time() - t1:5.1f}s{ok}")
             for c in INDEXE.get(tname, []):
                 if c in cols:
-                    cur.execute(f'create index on {SCHEMA}."{tname}" ("{c}")')
+                    cur.execute(f'create index on {schema}."{tname}" ("{c}")')
         cur.execute("update raw.quelldatei set zeilen = %s where id = %s", (gesamt, datei_id))
-        new_quelle(cur, datei_id, "gpc", "GPC-Datenbank gpi.mdb (Export 10.10.2015)", DATENSTAND, 75)
+        if quelle:
+            new_quelle(cur, datei_id, quelle[0], beschreibung, datenstand, quelle[1])
         cur.execute("update raw.import_lauf set beendet_am = now() where id = %s", (lauf_id,))
         con.commit()
     abw = [b for b in bericht if b[2]]
-    log(f"FERTIG in {(time.time() - t0) / 60:.1f} min · {len(tables)} Tabellen · {gesamt:,} Zeilen"
+    log(f"FERTIG {name} in {(time.time() - t0) / 60:.1f} min · {len(tables)} Tabellen · {gesamt:,} Zeilen"
         + (f" · {len(abw)} Tabellen mit abweichender Zeilenzahl: {abw}" if abw else " · alle Zeilenzahlen stimmen"))
+
+
+def run(root="/content/drive/MyDrive", cache_dir="/content/mdb_cache"):
+    for dateiname, schema, lieferant, datenstand, beschreibung, quelle in DATENBANKEN:
+        src = find_db(root, dateiname)
+        if not src:
+            log(f"{dateiname} nicht gefunden – übersprungen")
+            continue
+        import_db(root, src, schema, lieferant, datenstand, beschreibung, quelle, cache_dir)
 
 
 if __name__ == "__main__":

@@ -134,6 +134,8 @@ cells3 = [
 Übernimmt die Access-Datenbank der Grundfos-Software (Export 10.10.2015, ca. 1 GB, 153 Tabellen)
 **1:1** in das neue Schema `gpi`: Produkte, Ersatzteillisten mit Gültigkeitszeitraum, Zeichnungen,
 Dokumente in vielen Sprachen, Zubehör, Wettbewerber-Austausch, Kennlinien, Länder-Sortimente.
+Danach zusätzlich `ETB.MDB` (Ersatzteile KSB-Baureihen) als Rohdaten in das Schema `etb` – nichts geht verloren,
+es landet aber nicht im Grundfos-Stamm.
 
 - Die Quelldatei wird **nur gelesen**. Programmdateien werden nicht gestartet.
 - Alles läuft in **einer Transaktion**: Bei einem Fehler wird nichts geändert.

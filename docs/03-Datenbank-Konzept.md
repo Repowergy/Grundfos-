@@ -59,14 +59,26 @@ Danach Zuordnung nach `pim` (Artikel, `artikel_beziehung` Ersatzteil/Zubehör/Na
 
 ### Übrige Dateien
 - **`ETB.MDB` (43 MB): kein Grundfos!** Inhalt sind KSB-Baureihen (Amarex, Ama-Drainer, Etabloc, Multitec) mit
-  Teileliste (278.291), Teilestamm (13.952, Preise in DM) und Zeichnungs-Hotspots. Nach der Entscheidung „nur Grundfos“
-  wird sie nicht importiert. Die Kopien `ETB (1)/(2).MDB` sind identisch.
+  Teileliste (278.291), Teilestamm (13.952, Preise in DM) und Zeichnungs-Hotspots. Sie wird als Rohdaten in das
+  Schema `etb` übernommen (Grundsatz „nichts wegwerfen“), aber nicht in den Grundfos-Stamm `pim`.
+  Die Kopien `ETB (1)/(2).MDB` sind identisch.
 - `ETBv.MDB`, `ETB_WAE.MDB`, `ETB_DTXT.MDB`: Angebots-/Bestellmasken, Währungen, Formulartexte – leer bzw. ohne Produktdaten.
 - `GPIUser.mdb`: leere Benutzerdatenbank der Software.
 
 ---
 
-## 2. Leitidee: Daten statt Texte
+## 2. Grundsatz: nichts wegwerfen
+
+Für den Mastershop ist **jede Quelle wertvoll**. Deshalb gilt:
+- **Rohdaten bleiben vollständig erhalten**: DATANORM-Zeilen in `raw`, Access-Datenbanken 1:1 in eigenen Schemas
+  (`gpi`, `etb`), weitere Software-Daten folgen. Auch die Großhändler-Dateien liegen weiter in `raw`.
+- **Der Stamm `pim` wählt aus**: Nur geprüfte Grundfos-Daten bilden den „Golden Record“; jede andere Quelle kann
+  später per SQL zugeschaltet werden (z. B. Großhandel 2025 für fehlende Texte, Taxis über Typbezeichnung).
+- Jede Zeile behält Herkunft, Datenstand und Priorität – so ist jede Entscheidung umkehrbar.
+
+---
+
+## 3. Leitidee: Daten statt Texte
 
 Andere Shops übersetzen Texte. Wir speichern **Fakten sprachneutral** und erzeugen daraus Texte in jeder Sprache.
 
