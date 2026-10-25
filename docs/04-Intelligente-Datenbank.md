@@ -24,6 +24,7 @@ Grundsätze:
 | **Produktgruppen** | `pim.produktgruppe`, `artikel_gruppe` | GPC-Baum (z. B. ALPHA → ALPHA2). Dokumente hängen an der Gruppe statt millionenfach an Artikeln. |
 | **Märkte** | `pim.markt`, `artikel_markt`, `artikel_preis` | Sortiment und Listenpreis je Land (DE = `gws`, AT = `gpo`, CH = `gps` …) |
 | **Intelligente Suche** | `pim.suche(eingabe)` | Ein Suchfeld für Artikelnummer, EAN, Typbezeichnung (fehlertolerant), deutschen Volltext **und Fremdpumpen-Typ → Grundfos-Ersatz** |
+| **Fachbegriff-Suche** | `pim.suche_begriff(eingabe)`, `pim.suchbegriff`, `pim.artikel_elektrik` | „Heizungspumpe“, „Brunnenpumpe 230V“, „Hebeanlage“, „dosing pump“ → passende Baureihen, die besten Artikel zuerst; Spannungsangaben filtern automatisch (auch Bereiche wie „220-240“). Begriffe sind je Sprache erweiterbar. |
 | **Golden Record** | `pim.v_artikel_de` | Je Artikel der beste Text und Preis (Quelle mit der höchsten Priorität, dann der neueste Stand) |
 | **Qualitäts-Score** | `pim.artikel_qualitaet` (materialisiert) | 0–100 Punkte je Artikel (Preis, EAN, Texte, Merkmale, Bild, Zeichnung, Dokument, Beziehungen). Das ist die Arbeitsliste für die Datenpflege und der Filter für den Shop-Export. |
 
@@ -34,6 +35,7 @@ Grundsätze:
 select * from pim.suche('wilo Stratos PICO 25/1-6');   -- → ALPHA2 25-60 180 (Ersatz)
 select * from pim.suche('alpha2 25-60 180');           -- → alle Varianten
 select * from pim.suche('5710620964099');              -- → EAN
+select * from pim.suche_begriff('Brunnenpumpe 230V');  -- → SP 5A-4 einphasig (05001A04)
 
 -- Ersatzteile einer Pumpe mit Position und Baujahr
 select z.artikelnummer, t.text, b.position, b.menge, b.produktion_von, b.produktion_bis
