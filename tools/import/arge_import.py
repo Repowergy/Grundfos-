@@ -48,7 +48,8 @@ def tabelle_csv(data):
 
 def tabelle_xlsx(data):
     import openpyxl
-    wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    # nicht read_only: manche Dateien haben eine falsche Größenangabe (excelMP.xlsx wurde sonst mit 0 Zeilen gelesen)
+    wb = openpyxl.load_workbook(io.BytesIO(data), read_only=False, data_only=True)
     blaetter = {}
     for ws in wb.worksheets:
         rows = [["" if v is None else str(v).strip() for v in r] for r in ws.iter_rows(values_only=True)]
@@ -98,8 +99,11 @@ def run(root="/content/drive/MyDrive"):
                             tabellen, fmt, enc = tabelle_xlsx(data), "xlsx", None
                         else:  # DATANORM (bereits importiert), XML: nur verzeichnen
                             tabellen, fmt, enc = {}, ext.lstrip(".") or "datei", None
-                    cur.execute("select 1 from raw.quelldatei where sha256 = %s", (sha,))
-                    if cur.fetchone():
+                    cur.execute("select id, zeilen from raw.quelldatei where sha256 = %s", (sha,))
+                    alt = cur.fetchone()
+                    if alt and alt[1] == 0 and fmt == "xlsx":   # früher leer gelesen → neu einlesen
+                        cur.execute("delete from raw.quelldatei where id = %s", (alt[0],))
+                    elif alt:
                         continue
                     cur.execute("""insert into raw.quelldatei (lauf_id, pfad, sha256, groesse, format, lieferant,
                                                                datenstand, sprache, kopfzeile)
