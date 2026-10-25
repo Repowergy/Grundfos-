@@ -53,6 +53,12 @@ Das ist die Quelle für die **Verlinkungen**:
 | Länder-Sortimente | `ProductRange_*` (je Land: Nummer, Preis, Status), z. B. `General` 212.337, `gnl` 206.889 | Sortiment/Status je Markt, Altpreise als Referenz |
 | Sonstiges | `LANG` (35 Sprachen), `LIQUIDS` (187 Medien) + `LIQUIDSYNONYMS` (607), `Application` (220 Anwendungen) | Anwendungs- und Medienfilter |
 
+**Stand 25.10.2026 im Stamm `pim`:** 940.292 Artikel (128.523 historisch), 367.182 mit EAN, 6.988.538
+Ersatzteil-Beziehungen (Position, Menge, Gültigkeit), 3.475 Nachfolger-Beziehungen (Grundfos alt → neu),
+**72.733 Austausch-Vorschläge** für 8.095 Fremdpumpen (28 Hersteller, mit Länder-Preislisten) und
+**7.982 Wettbewerberpumpen** mit technischen Daten (`pim.fremdprodukt`: Flygt, KSB, Wilo, Lowara, ABS, Armstrong,
+Vortex, Nanfang). Alle 87.825 Austauschzeilen der Quelle sind abgedeckt (Rest = Dubletten je Preisliste).
+
 Import: `tools/import/Import_GPI_Colab.ipynb` → Schema `gpi` (1:1, alle Spalten als Text, Schlüssel indiziert).
 Danach Zuordnung nach `pim` (Artikel, `artikel_beziehung` Ersatzteil/Zubehör/Nachfolger, `medium`, `zeichnung_position`,
 `querverweis_wettbewerb`) per SQL.
