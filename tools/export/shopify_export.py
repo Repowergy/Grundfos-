@@ -8,10 +8,13 @@ im Shopify-Importformat (Produkte → Importieren).
 Festlegungen Pilot (26.10.2026):
   - Status „draft“, Published FALSE – nichts ist sofort sichtbar
   - kein Preis (Preisentscheidung offen) – Variant Price bleibt leer
-  - keine Bilder/Dokumente (Nutzungsrechte offen)
+  - Bilder: alle hochgeladenen Produktbilder (Supabase Storage, öffentliche URL), weitere Bilder als Zusatzzeilen
   - Metafelder im Namensraum „grundfos“ (Definitionen siehe docs/06-Shop-Export.md):
       typbezeichnung (Text), technische_daten (JSON [{code, name, wert}]), ersatzteile / zubehoer / nachfolger /
-      ersetzt_grundfos / ersetzt_wettbewerb (JSON-Listen mit Artikelnummern bzw. „Hersteller Typ“)
+      ersetzt_grundfos / ersetzt_wettbewerb / passt_zu (JSON-Listen), dokumente (JSON [{typ, titel, sprache, url}]),
+      kategorien (JSON „Anwendung > Unteranwendung“), produktart
+  - zusätzlich <ausgabe>.uebersetzungen.json: je Handle und Sprache Titel, Beschreibung und technische Daten
+    (für Shopify „Translate & Adapt“ / translationsRegister, sobald die Produkt-IDs des neuen Shops feststehen)
 
 Die CSV enthält Grundfos-Daten und gehört NICHT ins (öffentliche) Repository.
 """
@@ -19,6 +22,7 @@ import csv
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sql"))
 import supa  # noqa: E402
@@ -37,7 +41,13 @@ SPALTEN = [
     f"Ersetzt Grundfos ({META}ersetzt_grundfos)",
     f"Ersetzt Wettbewerb ({META}ersetzt_wettbewerb)",
     f"Datenqualität ({META}score)",
+    f"Produktart ({META}produktart)",
+    f"Passt zu ({META}passt_zu)",
+    f"Dokumente ({META}dokumente)",
+    f"Kategorien ({META}kategorien)",
+    "Image Src", "Image Position", "Image Alt Text",
 ]
+SPRACHEN = ["en", "fr", "it", "nl", "pl"]
 
 
 def seo_beschreibung(r):
@@ -59,15 +69,40 @@ def zeile(r):
         json.dumps(r["ersetzt_grundfos"], ensure_ascii=False),
         json.dumps(r["ersetzt_wettbewerb"], ensure_ascii=False),
         r["score"] if r["score"] is not None else "",
+        r["produktart"] or "",
+        json.dumps(r["passt_zu"], ensure_ascii=False),
+        json.dumps(r["dokumente"], ensure_ascii=False),
+        json.dumps(r["kategorien"], ensure_ascii=False),
+        (r["bilder"] or [""])[0], 1 if r["bilder"] else "", r["titel"] if r["bilder"] else "",
     ]
+
+
+def bildzeilen(r):
+    """Shopify-CSV: weitere Bilder als eigene Zeilen mit Handle + Bild"""
+    for i, url in enumerate((r["bilder"] or [])[1:], 2):
+        z = [""] * len(SPALTEN)
+        z[0] = r["handle"]
+        z[-3], z[-2], z[-1] = url, i, r["titel"]
+        yield z
+
+
+def abfrage(q, versuche=4):
+    """supa.sql mit Wiederholung (das API-Zeitlimit liegt bei ca. 30 s; parallel laufende Jobs bremsen)"""
+    for i in range(versuche):
+        try:
+            return supa.sql(q)
+        except SystemExit as e:
+            if i == versuche - 1 or "502" not in str(e) and "544" not in str(e):
+                raise
+            time.sleep(5 * (i + 1))
 
 
 def run(ausgabe, kanal="mastershop_pilot"):
     zeilen = []
     stand = 0
     while True:   # in Paketen, damit jede Abfrage unter dem API-Zeitlimit bleibt
-        paket = supa.sql(f"select * from pim.v_shop_export_de where kanal = '{kanal}' and rang > {stand} "
-                         f"order by rang limit 100")
+        paket = abfrage(f"select * from pim.v_shop_export_de where kanal = '{kanal}' and rang > {stand} "
+                        f"order by rang limit 40")
         if not paket:
             break
         zeilen += paket
@@ -77,7 +112,24 @@ def run(ausgabe, kanal="mastershop_pilot"):
         w.writerow(SPALTEN)
         for r in zeilen:
             w.writerow(zeile(r))
+            for z in bildzeilen(r):
+                w.writerow(z)
     print(f"{len(zeilen)} Produkte → {ausgabe}")
+
+    # Übersetzungen je Sprache
+    ue = {r["handle"]: {} for r in zeilen}
+    handle = {r["artikel_id"]: r["handle"] for r in zeilen}
+    ids = list(handle)
+    for sp in SPRACHEN:
+        for i in range(0, len(ids), 80):
+            teil = ",".join(str(x) for x in ids[i:i + 80])
+            for r in abfrage(f"select id, pim.shop_produkt(id, '{sp}') d from unnest(array[{teil}]::bigint[]) id"):
+                d = r["d"] or {}
+                ue[handle[r["id"]]][sp] = {k: d.get(k) for k in ("titel", "body_html", "kurz", "baureihe_text",
+                                                                  "technische_daten")}
+    with open(ausgabe + ".uebersetzungen.json", "w", encoding="utf-8") as f:
+        json.dump(ue, f, ensure_ascii=False)
+    print(f"Übersetzungen ({', '.join(SPRACHEN)}) → {ausgabe}.uebersetzungen.json")
 
 
 if __name__ == "__main__":
