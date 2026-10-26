@@ -327,3 +327,39 @@ arge_import.run('/content/drive/MyDrive')
 ]
 (here / "Import_Stammdaten2015_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells6), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_Stammdaten2015_Colab.ipynb")
+
+# ── Import 5: übrige Dateien der Zentralen Projektablage → raw ──
+pa_code = (here / "projektablage_import.py").read_text(encoding="utf-8")
+cells7 = [
+    md("""
+# Grundfos-PIM – Import 5: Zentrale Projektablage (übrige Dateien) → Supabase
+
+Liest alle Dateien in *GRUNDFOS – Zentrale Projektablage*, die noch nicht in Supabase sind:
+Website-Daten 08/2026 (Active Products, Ersatzteile, Pumpe↔Ersatzteil), Produkt- und Keyword-Listen,
+Shopify-Archiv 2021, Bildzuordnungen 2026, OXOMI-Abgleich, Notizen und Skripte – sowie fehlende DATANORM-Teile
+(z. B. *Original DATANORM 2016 / datanorm.002*). Tabellen werden zeilenweise gespeichert, PDF/EXE/Bilder nur verzeichnet.
+
+Nur lesen, nichts wird verändert. Bereits importierte Dateien werden übersprungen.
+Voraussetzung: Secret `SUPABASE_DB_URL`. **Laufzeit → Alle ausführen.** Dauer ca. 15–30 Minuten.
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip -q install "psycopg[binary]>=3.1" openpyxl
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/arge_import.py\n" + arge_code),
+    py("%%writefile /content/projektablage_import.py\n" + pa_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, arge_import, projektablage_import
+for m in (datenaudit, datanorm_import, arge_import, projektablage_import): importlib.reload(m)
+projektablage_import.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+(here / "Import_Projektablage_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells7), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_Projektablage_Colab.ipynb")

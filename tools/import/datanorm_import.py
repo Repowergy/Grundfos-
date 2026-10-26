@@ -268,6 +268,14 @@ def scan_datanorm(path, known):
 def import_datanorm_file(con, root, lauf_id, path, known):
     rel = os.path.relpath(path, root)
     v, n_a, gf, keys = scan_datanorm(path, known)
+    if not v:   # Folgedatei (datanorm.002 …) ohne eigenen V-Satz: Kopf aus der .001 im selben Ordner
+        for cand in (os.path.splitext(path)[0] + ".001", os.path.splitext(path)[0] + ".001".upper()):
+            if cand != path and os.path.exists(cand):
+                for _i, line in read_lines(cand):
+                    if line[:1].upper() == "V":
+                        v = line[:300]
+                        break
+                break
     datum, info = v_info(v)
     is_aux = os.path.splitext(path)[1].lower() in (".wrg", ".rab")
     hersteller_kopf = "GRUNDFOS" in v.upper()
