@@ -14,6 +14,20 @@ insert into pim.merkmal (code, bezeichnung, erklaerung, herkunft)
 values ('SHAFT_SEAL_CODE', 'Shaft seal code', 'Gleitringdichtung (Code)', 'gpc2023.QuickReplacement')
 on conflict (code) do nothing;
 
+-- Artikelnummer aus GPC 2023 normieren: 6–7-stellig numerisch → mit führender Null 8-stellig (7201925 → 07201925);
+-- null für Nicht-Nummern (≤ 5 Ziffern = interne Kennung, reine Wörter = Buchungscodes, Sonderzeichen, nur Nullen)
+create or replace function pim.gpc_nummer(t text)
+returns text
+language sql immutable
+as $$
+  select case
+           when n ~ '^[0-9]{6,7}$' then lpad(n, 8, '0')
+           when n ~ '^[0-9]{1,5}$' or n ~ '^[A-Z]+$' or n ~ '^0+$' then null
+           when n ~ '^[0-9A-Z][0-9A-Z.\-/]{2,19}$' then n
+         end
+    from (select upper(replace(trim(t), ' ', '')) as n) x
+$$;
+
 create or replace function pim.gpc2023_uebernehmen()
 returns table (schritt text, anzahl bigint)
 language plpgsql
@@ -38,19 +52,19 @@ begin
   -- 2. Artikel
   with nr as (
     select distinct on (norm) norm, nr from (
-      select norm, productno as nr, 1 as prio from gpc2023.sortiment
+      select pim.gpc_nummer(norm) as norm, productno as nr, 1 as prio from gpc2023.sortiment
       union all
-      select upper(replace(trim(daten->>'ProdNumber'), ' ', '')), trim(daten->>'ProdNumber'), 2 from gpc2023.vvs
+      select pim.gpc_nummer(daten->>'ProdNumber'), trim(daten->>'ProdNumber'), 2 from gpc2023.vvs
       union all
-      select upper(replace(trim(daten->>'DbIdentifier'), ' ', '')), trim(daten->>'DbIdentifier'), 3
+      select pim.gpc_nummer(daten->>'DbIdentifier'), trim(daten->>'DbIdentifier'), 3
         from gpc2023.schnellaustausch
        where daten->'DataValues'->0->>'BaseValue' = 'GRUNDFOS' and (daten->>'TemplateNo') <> '0'
     ) x
-     where norm ~ '^[0-9A-Z][0-9A-Z.\-/]{2,19}$' and norm !~ '^0+$'
+     where norm is not null
      order by norm, prio
   ), neu as (
     insert into pim.artikel (hersteller_id, artikelnummer, artikelnummer_norm)
-    select 1, nr, norm from nr
+    select 1, case when nr ~ '^[0-9]{6,7}$' then norm else nr end, norm from nr
     on conflict (hersteller_id, artikelnummer_norm) do nothing
     returning id
   )
@@ -62,7 +76,7 @@ begin
   select distinct on (a.id, m.code) a.id, m.code, 'sortiment', s.status, s.fasttrack = '1', v_quelle
     from gpc2023.sortiment s
     join pim.markt m on s.kuerzel in (m.gpc_code, m.gpc_code_2023)   -- 2023-Kürzel: siehe 0022
-    join pim.artikel a on a.hersteller_id = 1 and a.artikelnummer_norm = s.norm
+    join pim.artikel a on a.hersteller_id = 1 and a.artikelnummer_norm = pim.gpc_nummer(s.norm)
    order by a.id, m.code, s.status
   on conflict do nothing;
   get diagnostics n = row_count;
@@ -70,8 +84,8 @@ begin
 
   -- 4. VVS-Liste
   update pim.artikel a set ean = v.ean, aktualisiert_am = now()
-    from (select distinct on (upper(replace(trim(daten->>'ProdNumber'), ' ', '')))
-                 upper(replace(trim(daten->>'ProdNumber'), ' ', '')) as norm, daten->>'EanNo' as ean
+    from (select distinct on (pim.gpc_nummer(daten->>'ProdNumber'))
+                 pim.gpc_nummer(daten->>'ProdNumber') as norm, daten->>'EanNo' as ean
             from gpc2023.vvs where daten->>'EanNo' ~ '^\d{13}$'
            order by 1, 2) v
    where a.hersteller_id = 1 and a.artikelnummer_norm = v.norm and a.ean is null;
@@ -84,7 +98,7 @@ begin
     cross join lateral (values ('vvs', nullif(trim(v.daten->>'VvsNo'), '')),
                                ('typbezeichnung', nullif(trim(v.daten->>'Prodname'), ''))) x(typ, wert)
     join pim.artikel a on a.hersteller_id = 1
-                      and a.artikelnummer_norm = upper(replace(trim(v.daten->>'ProdNumber'), ' ', ''))
+                      and a.artikelnummer_norm = pim.gpc_nummer(v.daten->>'ProdNumber')
    where x.wert is not null
      and (x.typ = 'vvs' or not exists (select 1 from pim.artikel_alias t
                                         where t.artikel_id = a.id and t.typ = 'typbezeichnung'))
@@ -106,7 +120,7 @@ begin
   select distinct on (a.id, q.label) a.id, q.label, q.wert, pim.zahl(q.wert), '-', v_quelle
     from _qr q
     join pim.merkmal m on m.code = q.label
-    join pim.artikel a on a.hersteller_id = 1 and a.artikelnummer_norm = upper(replace(q.dbid, ' ', ''))
+    join pim.artikel a on a.hersteller_id = 1 and a.artikelnummer_norm = pim.gpc_nummer(q.dbid)
    where q.hersteller = 'GRUNDFOS'
      and not exists (select 1 from pim.artikel_merkmal x where x.artikel_id = a.id and x.merkmal_code = q.label)
    order by a.id, q.label, q.freq
@@ -117,7 +131,7 @@ begin
   insert into pim.artikel_alias (artikel_id, typ, wert, quelle_id)
   select distinct on (a.id) a.id, 'typbezeichnung', q.wert, v_quelle
     from _qr q
-    join pim.artikel a on a.hersteller_id = 1 and a.artikelnummer_norm = upper(replace(q.dbid, ' ', ''))
+    join pim.artikel a on a.hersteller_id = 1 and a.artikelnummer_norm = pim.gpc_nummer(q.dbid)
    where q.hersteller = 'GRUNDFOS' and q.label in ('PRODNAME', 'COMB_PRODUCT_NAME')
      and not exists (select 1 from pim.artikel_alias t where t.artikel_id = a.id and t.typ = 'typbezeichnung')
    order by a.id, q.label desc
