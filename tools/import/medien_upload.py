@@ -92,6 +92,21 @@ def hochladen(key, ziel, data, ctype):
     return f"Upload fehlgeschlagen: {err}"
 
 
+def eintragen(cur, alt, ziel, sha, err):
+    """Ergebnis in die Datenbank schreiben. Dieselbe Datei hängt oft an mehreren Medien (z. B. Literatur je
+    Sprache/Markt): einmal hochladen, alle Medien mit demselben Ziel auf einmal setzen."""
+    if err is None:
+        cur.execute("update pim.medium set storage_pfad = %s, extern_url = pim.medien_url(%s), sha256 = %s"
+                    " where id in (select medium_id from pim.medium_datei where ziel_pfad = %s and status = 'offen')",
+                    (f"{BUCKET}/{ziel}", ziel, sha, alt))
+        cur.execute("update pim.medium_datei set status = 'hochgeladen', ziel_pfad = %s, fehler = null,"
+                    " geaendert_am = now() where ziel_pfad = %s and status = 'offen'", (ziel, alt))
+    else:
+        st = "format_unbekannt" if err.startswith("unbekanntes Format") else "fehler"
+        cur.execute("update pim.medium_datei set status = %s, fehler = %s, geaendert_am = now()"
+                    " where ziel_pfad = %s and status = 'offen'", (st, err[:500], alt))
+
+
 def run(root="/content/drive/MyDrive", nur_typen=None):
     key = os.environ.get("SUPABASE_SERVICE_KEY")
     if not key:
@@ -136,22 +151,18 @@ def run(root="/content/drive/MyDrive", nur_typen=None):
 
             with ThreadPoolExecutor(THREADS) as ex:
                 for mid, alt, ziel, sha, err in ex.map(lade, jobs):
-                    # dieselbe Datei hängt oft an mehreren Medien (z. B. Literatur je Sprache/Markt):
-                    # einmal hochladen, alle Medien mit demselben Ziel auf einmal setzen
+                    try:
+                        eintragen(cur, alt, ziel, sha, err)
+                    except psycopg.Error as e:   # ein Datenbankfehler darf den Lauf nicht stoppen
+                        err = f"Datenbankfehler: {e!r}"
+                        cur.execute("update pim.medium_datei set status = 'fehler', fehler = %s, geaendert_am = now()"
+                                    " where ziel_pfad = %s and status = 'offen'", (err[:500], alt))
                     if err is None:
-                        cur.execute("update pim.medium set storage_pfad = %s, extern_url = pim.medien_url(%s), sha256 = %s"
-                                    " where id in (select medium_id from pim.medium_datei"
-                                    "               where ziel_pfad = %s and status = 'offen')",
-                                    (f"{BUCKET}/{ziel}", ziel, sha, alt))
-                        cur.execute("update pim.medium_datei set status = 'hochgeladen', ziel_pfad = %s, fehler = null,"
-                                    " geaendert_am = now() where ziel_pfad = %s and status = 'offen'", (ziel, alt))
                         ok += 1
+                    elif err.startswith("unbekanntes Format"):
+                        unbek += 1
                     else:
-                        st = "format_unbekannt" if err.startswith("unbekanntes Format") else "fehler"
-                        unbek += st == "format_unbekannt"
-                        fehl += st == "fehler"
-                        cur.execute("update pim.medium_datei set status = %s, fehler = %s, geaendert_am = now()"
-                                    " where ziel_pfad = %s and status = 'offen'", (st, err[:500], alt))
+                        fehl += 1
             log(f"  hochgeladen {ok:,} · Fehler {fehl:,} · Format unbekannt {unbek:,} · {(time.time() - t0) / 60:.1f} min")
     log(f"FERTIG: {ok:,} Dateien hochgeladen, {fehl:,} Fehler, {unbek:,} unbekanntes Format")
 
