@@ -27,6 +27,9 @@ begin
          lower(regexp_replace(q.pfad, '^.*/', '')) as name, q.pfad, q.groesse
     from raw.quelldatei q
    where q.format = 'bild' and q.pfad like '%Bildzuordnungen und Bildquellen (Shopify 2026)/%'
+     -- Name schon als Bild aus einer anderen Quelle vorhanden und hochgeladen (z. B. ARGE gfv_04049.png) → kein Doppel
+     and not exists (select 1 from pim.medium a where lower(a.dateiname) = lower(regexp_replace(q.pfad, '^.*/', ''))
+                       and a.typ = 'bild' and a.extern_url is not null)
    order by lower(regexp_replace(q.pfad, '^.*/', '')), q.groesse desc;
 
   insert into pim.medium (typ, dateiname, titel, kategorie, quell_schluessel, quelle_id)
@@ -56,7 +59,8 @@ begin
     join raw.quelldatei q on q.id = t.datei_id
     join pim.artikel a on a.hersteller_id = 1
                       and a.artikelnummer_norm = upper(replace(btrim(t.daten ->> 'Werksartikelnummer'), ' ', ''))
-    join pim.medium m on m.quell_schluessel = 'bild2026:' || lower(btrim(t.daten ->> 'Dokument'))
+    join pim.medium m on m.typ = 'bild' and lower(m.dateiname) = lower(btrim(t.daten ->> 'Dokument'))
+                     and (m.quelle_id = v_quelle or m.extern_url is not null)
    where q.pfad like '%Bildzuordnungen und Bildquellen (Shopify 2026)/%' and t.daten ? 'Werksartikelnummer'
      and t.daten ? 'Dokument'
    order by a.id, m.id
