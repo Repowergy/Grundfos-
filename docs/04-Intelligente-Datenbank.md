@@ -26,6 +26,9 @@ Grundsätze:
 | **Intelligente Suche** | `pim.suche(eingabe)` | Ein Suchfeld für Artikelnummer, EAN, Typbezeichnung (fehlertolerant), deutschen Volltext **und Fremdpumpen-Typ → Grundfos-Ersatz** |
 | **Fachbegriff-Suche** | `pim.suche_begriff(eingabe)`, `pim.suchbegriff`, `pim.artikel_elektrik` | „Heizungspumpe“, „Brunnenpumpe 230V“, „Hebeanlage“, „dosing pump“ → passende Baureihen, die besten Artikel zuerst; Spannungsangaben filtern automatisch (auch Bereiche wie „220-240“). Begriffe sind je Sprache erweiterbar. |
 | **Golden Record** | `pim.v_artikel_de` | Je Artikel der beste Text und Preis (Quelle mit der höchsten Priorität, dann der neueste Stand) |
+| **Text-Engine** | `pim.text_erzeugen(artikel, sprache, 'SHORT'/'LONG')`, `text_regel`, `textbaustein`, `text_familie` | Baut Grundfos-Produkttexte aus HybrisQt-Regeln und Merkmalen in allen Sprachen der Vorlagen (CR, CM, NB, NK, NKG, SP, TP, MTR, Hydro MPC/Multi-E, SEG). Fehlt ein Merkmal, entfällt der Satz |
+| **Zubehör** | `pim.gruppe_zubehoer`, `pim.zubehoer(artikel)` | Zubehörartikel und Zubehörgruppen je Baureihe, gilt für alle Untergruppen |
+| **Bestseller** | `pim.artikel_beliebt` | „Popular now“ je Land mit Rang |
 | **Qualitäts-Score** | `pim.artikel_qualitaet` (materialisiert) | 0–100 Punkte je Artikel (Preis, EAN, Texte, Merkmale, Bild, Zeichnung, Dokument, Beziehungen). Das ist die Arbeitsliste für die Datenpflege und der Filter für den Shop-Export. |
 
 ## 2. Beispiele
@@ -63,9 +66,6 @@ Große Schritte laufen als `pg_cron`-Jobs direkt in der Datenbank. Sie arbeiten 
 
 ## 4. Nächste Ausbaustufen
 
-1. **Texte in 27 Sprachen** aus `HybrisQt` (GPC 2023): Textbausteine je Baureihe und Merkmal und das Regelwerk dazu, welcher Text für welche Pumpe gilt. Nach dem Import 3 wertet die Datenbank die Regeln je Artikel aus.
-2. **Merkmalsnamen in allen Sprachen** aus den Sprachpaketen `ctf`.
-3. **Sortimente 2023** (`Control/ProductRange`) als neuerer Marktstand. Austausch 2023 (`QuickReplacement.cache`).
+1. ~~Texte in 27 Sprachen (Text-Engine)~~ · ~~Merkmalsnamen aus `ctf`~~ · ~~Sortimente/Schnellaustausch 2023~~ · ~~Zubehör~~ – erledigt 25./26.10.
 4. **Semantische Suche** mit `pgvector`: Anfragen wie „Pumpe für 30 m tiefen Brunnen, 230 V“ in jeder Sprache.
 5. **ETIM-Klassen** über `merkmal_alias` (Typ `etim`) für Großhandel und BMEcat-Export.
-6. **Stammdaten 2015 (ARGE)**: Nachfolgeartikel, Bildzuordnungen, Abmessungen.
