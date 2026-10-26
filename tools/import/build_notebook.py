@@ -363,3 +363,42 @@ projektablage_import.run('/content/drive/MyDrive')
 ]
 (here / "Import_Projektablage_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells7), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_Projektablage_Colab.ipynb")
+
+# ── Import 6: Bilder und Dokumente → Supabase Storage ──
+mu_code = (here / "medien_upload.py").read_text(encoding="utf-8")
+cells8 = [
+    md("""
+# Grundfos-PIM – Import 6: Bilder und Dokumente → Supabase Storage
+
+Lädt Produktbilder, Maß- und Schaltbilder, Explosionszeichnungen, Datenblätter, Anleitungen und Service-Dokumente
+aus Drive (Grundfos-Software 2023, Stammdaten 2015) in den öffentlichen Supabase-Speicher `medien`.
+TIF wird in PNG umgewandelt. Ein erneuter Start macht dort weiter, wo der letzte aufgehört hat.
+
+**Einmalig zwei Secrets** (Schlüssel-Symbol links, jeweils *Notebook-Zugriff* einschalten):
+- `SUPABASE_DB_URL` – wie bei den anderen Notebooks
+- `SUPABASE_SERVICE_KEY` – Supabase → *Project Settings → API Keys* → Schlüssel **service_role** (bzw. „secret“)
+
+**Laufzeit → Alle ausführen.** Dauer: Bilder ca. 20–40 Minuten, mit allen PDFs (≈ 6 GB) 1–3 Stunden.
+Tab offen lassen; bei Abbruch einfach neu starten.
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip -q install "psycopg[binary]>=3.1" pillow
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/medien_upload.py\n" + mu_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+os.environ['SUPABASE_SERVICE_KEY'] = userdata.get('SUPABASE_SERVICE_KEY')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, medien_upload
+for m in (datenaudit, datanorm_import, medien_upload): importlib.reload(m)
+medien_upload.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – Claude kurz Bescheid geben."),
+]
+(here / "Medien_Upload_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells8), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Medien_Upload_Colab.ipynb")
