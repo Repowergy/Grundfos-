@@ -30,7 +30,7 @@ begin
   insert into pim.markt (code, name, gpc_code, ist_land)
   select distinct 'GPC:' || s.kuerzel, 'GPC-Preisliste ' || s.kuerzel || ' (2023)', s.kuerzel, false
     from gpc2023.sortiment s
-   where not exists (select 1 from pim.markt m where m.gpc_code = s.kuerzel)
+   where not exists (select 1 from pim.markt m where s.kuerzel in (m.gpc_code, m.gpc_code_2023))
   on conflict do nothing;
   get diagnostics n = row_count;
   schritt := '1 neue Märkte/Preislisten'; anzahl := n; return next;
@@ -61,7 +61,7 @@ begin
   insert into pim.artikel_markt (artikel_id, markt, status, gpc_status, fasttrack, quelle_id)
   select distinct on (a.id, m.code) a.id, m.code, 'sortiment', s.status, s.fasttrack = '1', v_quelle
     from gpc2023.sortiment s
-    join pim.markt m on m.gpc_code = s.kuerzel
+    join pim.markt m on s.kuerzel in (m.gpc_code, m.gpc_code_2023)   -- 2023-Kürzel: siehe 0022
     join pim.artikel a on a.hersteller_id = 1 and a.artikelnummer_norm = s.norm
    order by a.id, m.code, s.status
   on conflict do nothing;

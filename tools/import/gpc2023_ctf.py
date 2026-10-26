@@ -7,8 +7,8 @@ Grundfos-PIM – GPC-Software 2023: Sprachpakete (datafile/ctf/<SPRACHE>.zip) �
 
 Aufbau: Kopf bis zur ersten Zeile '#', danach Blöcke „Schlüssel / Text … / #“.
 Die Texte sind in der Quelle doppelt kodiert (UTF-8-Bytes als cp850 gelesen, z. B. „ð▓ð©ðÂ“ = „виж“) –
-sie werden hier repariert. Übernommen wird nur, was im Merkmalskatalog existiert; vorhandene Übersetzungen
-bleiben unverändert. Im Datenordner 2023 liegt nur das bulgarische Paket (BGR).
+sie werden hier repariert. Übernommen wird nur, was im Merkmalskatalog existiert. Vorhandene Übersetzungen bleiben unverändert –
+außer maschinell gelernte (Status 'maschinell'): die ersetzt der offizielle Grundfos-Name. Im Datenordner 2023 liegen 33 Sprachpakete.
 
   python3 -I tools/import/gpc2023_ctf.py
 """
@@ -64,7 +64,11 @@ def run():
               from x join pim.merkmal m on m.code = x.c
               cross join (select id from pim.quelle where typ = 'gpc2023' limit 1) q
              where coalesce(x.b, '') <> ''
-            on conflict do nothing returning 1)
+            on conflict (merkmal_code, sprache) do update
+              set bezeichnung = excluded.bezeichnung, erklaerung = excluded.erklaerung,
+                  status = 'quelle', quelle_id = excluded.quelle_id
+              where pim.merkmal_uebersetzung.status = 'maschinell'   -- offizielle Namen ersetzen gelernte
+            returning 1)
           select (select count(*) from x) gelesen, (select count(*) from ins) neu""")
         print(sp, iso, res)
 
