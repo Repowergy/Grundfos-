@@ -64,12 +64,13 @@ begin
   get diagnostics n = row_count;
   schritt := 'Zuordnung aus Liste'; anzahl := n; return next;
 
-  -- 2. Artikelnummer im Dateinamen (gfb_w-96553046.jpg, gfb_d-96553046_2.jpg …)
+  -- 2. Artikelnummer im Dateinamen (gfb_w-96553046.jpg, gfb_d96076196.jpg; mind. 7 Zeichen, damit laufende
+  --    Bildnummern wie gfb_d00110 nicht als Artikelnummer gelten)
   insert into pim.artikel_medium (artikel_id, medium_id, rolle, sortierung, quelle_id)
   select a.id, m.id, 'galerie', 5, v_quelle
     from pim.medium m
     join pim.artikel a on a.hersteller_id = 1
-                      and a.artikelnummer_norm = upper(substring(m.dateiname from '^gf[a-z]_[a-z]-([0-9a-z]+)'))
+                      and a.artikelnummer_norm = upper(substring(m.dateiname from '^gf[a-z]_[a-z]-?([0-9a-z]{7,})\.'))
    where m.quelle_id = v_quelle
      and not exists (select 1 from pim.artikel_medium x where x.medium_id = m.id and x.artikel_id = a.id)
   on conflict do nothing;
