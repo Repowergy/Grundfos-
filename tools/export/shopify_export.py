@@ -8,7 +8,8 @@ im Shopify-Importformat (Produkte → Importieren).
 Festlegungen Pilot (26.10.2026):
   - Status „draft“, Published FALSE – nichts ist sofort sichtbar
   - kein Preis (Preisentscheidung offen) – Variant Price bleibt leer
-  - Bilder: alle hochgeladenen Produktbilder (Supabase Storage, öffentliche URL), weitere Bilder als Zusatzzeilen
+  - Bilder: eigene Produktbilder (Supabase Storage, öffentliche URL), sonst Explosionszeichnung (Ersatzteile, mit
+    Positionsnummer im Alt-Text) bzw. Bild der Baureihe (pim.shop_bilder); weitere Bilder als Zusatzzeilen
   - Metafelder im Namensraum „grundfos“ (Definitionen siehe docs/06-Shop-Export.md):
       typbezeichnung (Text), technische_daten (JSON [{code, name, wert}]), ersatzteile / zubehoer / nachfolger /
       ersetzt_grundfos / ersetzt_wettbewerb / passt_zu (JSON-Listen), dokumente (JSON [{typ, titel, sprache, url}]),
@@ -73,8 +74,13 @@ def zeile(r):
         json.dumps(r["passt_zu"], ensure_ascii=False),
         json.dumps(r["dokumente"], ensure_ascii=False),
         json.dumps(r["kategorien"], ensure_ascii=False),
-        (r["bilder"] or [""])[0], 1 if r["bilder"] else "", r["titel"] if r["bilder"] else "",
+        (r["bilder"] or [""])[0], 1 if r["bilder"] else "", bildtext(r) if r["bilder"] else "",
     ]
+
+
+def bildtext(r):
+    """Alt-Text: Hinweis der Ersatzlösung (z. B. „Explosionszeichnung – Position 49“) vor dem Produkttitel"""
+    return f"{r['titel']} – {r['bild_alt']}" if r.get("bild_alt") else r["titel"]
 
 
 def bildzeilen(r):
@@ -82,7 +88,7 @@ def bildzeilen(r):
     for i, url in enumerate((r["bilder"] or [])[1:], 2):
         z = [""] * len(SPALTEN)
         z[0] = r["handle"]
-        z[-3], z[-2], z[-1] = url, i, r["titel"]
+        z[-3], z[-2], z[-1] = url, i, bildtext(r)
         yield z
 
 

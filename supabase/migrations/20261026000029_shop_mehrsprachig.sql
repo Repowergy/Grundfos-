@@ -292,13 +292,7 @@ select s.kanal, s.rang, s.grund,
        (select coalesce(jsonb_agg(x.artikelnummer), '[]') from (
           select distinct v.artikelnummer from pim.artikel_beziehung b join pim.artikel v on v.id = b.von_artikel_id
            where b.zu_artikel_id = g.id and b.typ = 'ersatzteil' order by 1 limit 500) x) as passt_zu,
-       (select coalesce(jsonb_agg(b.extern_url order by b.sortierung nulls last, b.id), '[]')
-          from (select distinct on (regexp_replace(lower(m.dateiname), '^(gf[a-z])_[wd]', '\1_'))   -- ARGE: Web (w) und
-                       m.id, m.extern_url, am.sortierung                                            -- Druck (d) = gleiches
-                  from pim.artikel_medium am join pim.medium m on m.id = am.medium_id               -- Bild → nur Druck
-                 where am.artikel_id = g.id and m.typ = 'bild' and m.extern_url is not null
-                 order by regexp_replace(lower(m.dateiname), '^(gf[a-z])_[wd]', '\1_'),
-                          (lower(m.dateiname) ~ '^gf[a-z]_d') desc, m.id) b) as bilder,
+       bi.b->'urls' as bilder,   -- mit Ersatzlösungen, s. 0032
        (select coalesce(jsonb_agg(jsonb_build_object('typ', m.typ, 'titel', coalesce(m.titel, m.dateiname),
                                                       'sprache', m.sprache, 'url', m.extern_url)), '[]')
           from (select distinct m.id, m.typ, m.titel, m.dateiname, m.sprache, m.extern_url
@@ -318,8 +312,11 @@ select s.kanal, s.rang, s.grund,
           join pim.shop_kategorie k on k.id = kg.kategorie_id
           join pim.shop_kategorie_text t on t.kategorie_id = k.id and t.sprache = 'de'
           left join pim.shop_kategorie_text tp on tp.kategorie_id = k.parent_id and tp.sprache = 'de'
-         where ag.artikel_id = g.id and k.code not in ('GENERAL')) as kategorien
+         where ag.artikel_id = g.id and k.code not in ('GENERAL')) as kategorien,
+       bi.b->>'alt' as bild_alt,
+       bi.b->>'art' as bild_art
   from pim.shop_auswahl s
   join pim.v_artikel_de g on g.id = s.artikel_id
   cross join lateral (select pim.shop_produkt(g.id, 'de') as d) p
+  cross join lateral (select pim.shop_bilder(g.id, p.d->>'produktart') as b) bi
   left join pim.artikel_qualitaet q on q.artikel_id = s.artikel_id;
