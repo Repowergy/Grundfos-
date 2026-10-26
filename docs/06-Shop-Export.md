@@ -54,3 +54,31 @@ Metafeld-Definitionen im neuen Shop (*Einstellungen → Benutzerdefinierte Daten
 - Bild- und Dokumentrechte
 - Shop anlegen und hier verbinden (Shopify-Connector zeigt derzeit solarics.de)
 - Weitere Sprachen (Texte en vorhanden; fr/it/nl/pl über die Text-Engine)
+
+
+## 5. Ausbau 26.10.2026 (Schritte 1–4)
+
+**Bilder und Dokumente** (Freigabe zur vollständigen Nutzung liegt vor)
+- Bucket `medien` in Supabase Storage (öffentlich lesbar), `pim.medium_datei`: 26.706 Medien → 11.846 Dateien (4,4 GB)
+- Hochladen: Colab `tools/import/Medien_Upload_Colab.ipynb` (Secrets `SUPABASE_DB_URL`, `SUPABASE_SERVICE_KEY`), TIF → PNG;
+  `.np2` (Grundfos-Zeichnungsformat) wird geprüft und ggf. als „format_unbekannt“ markiert
+- Export: `Image Src` (erstes Bild, weitere als Zusatzzeilen), Metafeld `dokumente` (Datenblätter, Anleitungen, Maß-/Schaltbilder)
+
+**Mehrsprachigkeit**
+- `pim.uebersetzung`: 1,11 Mio. Einträge aus den 33 GPC-Sprachpaketen (Produktgruppen, Anwendungen, Ersatzteil- und
+  Zubehörnamen, Merkmalswerte, Dokumentarten …), doppelte Kodierung repariert (`pim.cp850_reparieren`)
+- `pim.shop_produkt(artikel, sprache)`: Titel, Beschreibung, technische Daten (Namen **und Werte** übersetzt) je Sprache
+- Text-Engine läuft für fr, it, nl, pl (de, en fertig)
+- Export schreibt zusätzlich `<datei>.uebersetzungen.json` (en, fr, it, nl, pl) für Shopify „Translate & Adapt“
+
+**Kategorien**
+- `pim.shop_kategorie` (+ `_text`, `_gruppe`): Anwendungsbaum der GPC-Datenbank, 220 Knoten, Namen in allen Sprachen
+  (Heizung › Zirkulation bei Heizungsanlagen › ALPHA, MAGNA …), Metafeld `kategorien`
+- zusätzlich `pim.artikel_webkategorie`: Kategoriepfad der Grundfos-Website 08/2026 für 290.000 Artikel
+
+**Ersatzteile und Zubehör als Produkte**
+- Pilot erweitert auf **3.354 Produkte**: 537 Pumpen + 1.297 Ersatzteile + 1.520 Zubehör (`pim.shop_pilot_teile_anlegen`)
+- Ersatzteile: Titel aus übersetztem Teilenamen („Grundfos Gleitringdichtung (96810169)“), Beschreibung
+  „Original-Grundfos-Ersatzteil … Passend für: CM, CME“, Metafeld `passt_zu` (Pumpen-Artikelnummern)
+- Verknüpfung Pumpe ↔ Ersatzteil fest im Stamm: 6.988.538 Verknüpfungen, 336.307 Pumpen, 86.815 Teile, alle mit
+  Produktionszeitraum, 3,2 Mio. mit Positionsnummer; dazu 100.000 Service-Sonderausführungen (Website 2026, Kandidaten)
