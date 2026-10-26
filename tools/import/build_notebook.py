@@ -376,7 +376,7 @@ TIF wird in PNG umgewandelt. Ein erneuter Start macht dort weiter, wo der letzte
 
 **Einmalig zwei Secrets** (Schlüssel-Symbol links, jeweils *Notebook-Zugriff* einschalten):
 - `SUPABASE_DB_URL` – wie bei den anderen Notebooks
-- `SUPABASE_SERVICE_KEY` – Supabase → *Project Settings → API Keys* → Schlüssel **service_role** (bzw. „secret“)
+- `SUPABASE_SERVICE_KEY` – Supabase → *Project Settings → API Keys* → Reiter *Publishable and secret API keys* → **Secret key** (`sb_secret_…`); alternativ Reiter *Legacy* → `service_role`
 
 **Laufzeit → Alle ausführen.** Dauer: Bilder ca. 20–40 Minuten, mit allen PDFs (≈ 6 GB) 1–3 Stunden.
 Tab offen lassen; bei Abbruch einfach neu starten.

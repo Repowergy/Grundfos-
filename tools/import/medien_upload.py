@@ -10,8 +10,8 @@ Reihenfolge: Produktbilder → Maß-/Schaltbilder → Explosionszeichnungen → 
 Nach dem Hochladen: medium_datei.status = 'hochgeladen', pim.medium.storage_pfad / extern_url / sha256 gesetzt.
 Ein erneuter Lauf macht dort weiter, wo er aufgehört hat.
 
-Secrets (Colab, Schlüssel-Symbol): SUPABASE_DB_URL und SUPABASE_SERVICE_KEY (Supabase → Project Settings → API Keys,
-„service_role“/„secret“). Der Schlüssel wird nur für den Upload benutzt und nirgends gespeichert oder ausgegeben.
+Secrets (Colab, Schlüssel-Symbol): SUPABASE_DB_URL und SUPABASE_SERVICE_KEY (Supabase → Project Settings → API Keys:
+neuer „Secret key“ sb_secret_… oder alter „service_role“-Schlüssel). Der Schlüssel wird nur für den Upload benutzt und nirgends gespeichert oder ausgegeben.
 """
 
 import hashlib
@@ -71,9 +71,11 @@ def aufbereiten(data, ext, ziel):
 
 
 def hochladen(key, ziel, data, ctype):
+    kopf = {"apikey": key, "x-upsert": "true", "Content-Type": ctype, "Cache-Control": "max-age=31536000"}
+    if not key.startswith("sb_secret_"):   # alter service_role-Schlüssel (JWT) zusätzlich als Bearer; neue nicht
+        kopf["Authorization"] = f"Bearer {key}"
     req = urllib.request.Request(f"{SUPABASE_URL}/storage/v1/object/{BUCKET}/{ziel}", data=data, method="POST",
-                                 headers={"Authorization": f"Bearer {key}", "apikey": key, "x-upsert": "true",
-                                          "Content-Type": ctype, "Cache-Control": "max-age=31536000"})
+                                 headers=kopf)
     err = ""
     for versuch in range(4):
         try:
