@@ -292,9 +292,13 @@ select s.kanal, s.rang, s.grund,
        (select coalesce(jsonb_agg(x.artikelnummer), '[]') from (
           select distinct v.artikelnummer from pim.artikel_beziehung b join pim.artikel v on v.id = b.von_artikel_id
            where b.zu_artikel_id = g.id and b.typ = 'ersatzteil' order by 1 limit 500) x) as passt_zu,
-       (select coalesce(jsonb_agg(m.extern_url order by am.sortierung nulls last, m.id), '[]')
-          from pim.artikel_medium am join pim.medium m on m.id = am.medium_id
-         where am.artikel_id = g.id and m.typ = 'bild' and m.extern_url is not null) as bilder,
+       (select coalesce(jsonb_agg(b.extern_url order by b.sortierung nulls last, b.id), '[]')
+          from (select distinct on (regexp_replace(lower(m.dateiname), '^(gf[a-z])_[wd]', '\1_'))   -- ARGE: Web (w) und
+                       m.id, m.extern_url, am.sortierung                                            -- Druck (d) = gleiches
+                  from pim.artikel_medium am join pim.medium m on m.id = am.medium_id               -- Bild → nur Druck
+                 where am.artikel_id = g.id and m.typ = 'bild' and m.extern_url is not null
+                 order by regexp_replace(lower(m.dateiname), '^(gf[a-z])_[wd]', '\1_'),
+                          (lower(m.dateiname) ~ '^gf[a-z]_d') desc, m.id) b) as bilder,
        (select coalesce(jsonb_agg(jsonb_build_object('typ', m.typ, 'titel', coalesce(m.titel, m.dateiname),
                                                       'sprache', m.sprache, 'url', m.extern_url)), '[]')
           from (select distinct m.id, m.typ, m.titel, m.dateiname, m.sprache, m.extern_url
