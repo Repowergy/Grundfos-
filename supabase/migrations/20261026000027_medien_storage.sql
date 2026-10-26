@@ -26,6 +26,7 @@ create table if not exists pim.medium_datei (
   geaendert_am timestamptz not null default now()
 );
 create index if not exists medium_datei_status_idx on pim.medium_datei (status);
+create index if not exists medium_datei_ziel_idx on pim.medium_datei (ziel_pfad);   -- Upload setzt Status je Zieldatei
 alter table pim.medium_datei enable row level security;
 
 create or replace function pim.medien_url(p_ziel text)
