@@ -60,7 +60,8 @@ begin
   select distinct on (m.id) m.id, v_gpc, f.container,
          case when f.container is null then f.pfad else substring(f.pfad from position('!/' in f.pfad) + 2) end,
          f.ext, f.groesse,
-         'gpc/' || m.typ || '/' || f.k || case when f.ext in ('.tif', '.tiff') then '.png' else f.ext end
+         'gpc/' || m.typ || '/' || regexp_replace(f.k, '[^a-z0-9._-]+', '_', 'g')   -- Leerzeichen u. Ä. → _ (URL)
+           || case when f.ext in ('.tif', '.tiff') then '.png' else f.ext end
     from pim.medium m
     join _f f on f.k = lower(regexp_replace(regexp_replace(m.dateiname, '^.*/', ''), '\.[^.]+$', ''))
     left join pim.sprache ms on ms.iso = m.sprache
@@ -79,7 +80,7 @@ begin
   insert into pim.medium_datei (medium_id, basis, container, pfad, ext, groesse, ziel_pfad)
   select distinct on (m.id) m.id, '', split_part(q.pfad, '!/', 1), split_part(q.pfad, '!/', 2),
          lower(substring(q.pfad from '(\.[^.]+)$')), q.groesse,
-         'arge/' || lower(m.dateiname)
+         'arge/' || regexp_replace(lower(m.dateiname), '[^a-z0-9._-]+', '_', 'g')
     from pim.medium m
     join raw.quelldatei q on q.format = 'bild' and lower(q.pfad) like '%/' || lower(m.dateiname)
    where m.quelle_id = (select id from pim.quelle where typ = 'arge' order by id limit 1)
