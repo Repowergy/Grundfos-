@@ -57,8 +57,9 @@ begin
   create index on _f (k);
 
   insert into pim.medium_datei (medium_id, basis, container, pfad, ext, groesse, ziel_pfad)
-  select distinct on (m.id) m.id, v_gpc, f.container,
-         case when f.container is null then f.pfad else substring(f.pfad from position('!/' in f.pfad) + 2) end,
+  -- einzelne Dateien (z. B. datafile/Service/A_941103.tif): gpc2023.datei.container = eigener Pfad → kein ZIP
+  select distinct on (m.id) m.id, v_gpc, case when f.pfad like '%!/%' then f.container end,
+         case when f.pfad like '%!/%' then substring(f.pfad from position('!/' in f.pfad) + 2) else f.pfad end,
          f.ext, f.groesse,
          'gpc/' || m.typ || '/' || regexp_replace(f.k, '[^a-z0-9._-]+', '_', 'g')   -- Leerzeichen u. Ä. → _ (URL)
            || case when f.ext in ('.tif', '.tiff') then '.png' else f.ext end
