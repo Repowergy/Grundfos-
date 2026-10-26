@@ -126,11 +126,13 @@ def run(ausgabe, kanal="mastershop_pilot"):
             w.writerow(zeile(r))
             for z in bildzeilen(r):
                 w.writerow(z)
-    print(f"{len(zeilen)} Produkte → {ausgabe}")
+    print(f"{len(zeilen)} Produkte → {ausgabe}", flush=True)
+    uebersetzungen(ausgabe, {r["artikel_id"]: r["handle"] for r in zeilen})
 
-    # Übersetzungen je Sprache
-    ue = {r["handle"]: {} for r in zeilen}
-    handle = {r["artikel_id"]: r["handle"] for r in zeilen}
+
+def uebersetzungen(ausgabe, handle):
+    """<ausgabe>.uebersetzungen.json: Titel, Texte, technische Daten und Dokumente je Sprache und Handle"""
+    ue = {h: {} for h in handle.values()}
     ids = list(handle)
     for sp in SPRACHEN:
         for i in range(0, len(ids), 40):
@@ -141,10 +143,24 @@ def run(ausgabe, kanal="mastershop_pilot"):
                 ue[handle[r["id"]]][sp] = {k: d.get(k) for k in ("titel", "body_html", "kurz", "baureihe_text",
                                                                   "technische_daten")}
                 ue[handle[r["id"]]][sp]["dokumente"] = r["dok"]
+        print(f"  {sp}: {len(ids)} Produkte", flush=True)
     with open(ausgabe + ".uebersetzungen.json", "w", encoding="utf-8") as f:
         json.dump(ue, f, ensure_ascii=False)
-    print(f"Übersetzungen ({', '.join(SPRACHEN)}) → {ausgabe}.uebersetzungen.json")
+    print(f"Übersetzungen ({', '.join(SPRACHEN)}) → {ausgabe}.uebersetzungen.json", flush=True)
+
+
+def nur_uebersetzungen(ausgabe, kanal="mastershop_pilot"):
+    """Übersetzungen zu einer vorhandenen CSV neu erzeugen (Handles aus der CSV, Zuordnung über die SKU)"""
+    with open(ausgabe, encoding="utf-8") as f:
+        sku_handle = {r["Variant SKU"]: r["Handle"] for r in csv.DictReader(f) if r["Variant SKU"]}
+    ids = abfrage(f"select s.artikel_id, a.artikelnummer from pim.shop_auswahl s join pim.artikel a on a.id = s.artikel_id "
+                  f"where s.kanal = '{kanal}'")
+    uebersetzungen(ausgabe, {r["artikel_id"]: sku_handle[r["artikelnummer"]] for r in ids
+                             if r["artikelnummer"] in sku_handle})
 
 
 if __name__ == "__main__":
-    run(*sys.argv[1:3])
+    if sys.argv[1:2] == ["--nur-uebersetzungen"]:
+        nur_uebersetzungen(*sys.argv[2:4])
+    else:
+        run(*sys.argv[1:3])
