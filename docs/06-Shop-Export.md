@@ -33,7 +33,8 @@ Prüfwerte der Pilot-Datei: alle 537 mit EAN · 535 mit Beschreibung · 534 mit 
 | Variant SKU / Barcode / Grams | Artikelnummer / EAN / Bruttogewicht |
 | Variant Price | **leer** – Preisentscheidung offen |
 | Status / Published | draft / FALSE |
-| Bilder, Dokumente | **noch nicht** – Nutzungsrechte offen |
+| Image Src / Position / Alt | `pim.shop_bilder()`: eigenes Bild, sonst Explosionszeichnung (Ersatzteile), sonst Baureihenbild |
+| Metafeld `dokumente` | `pim.shop_dokumente(artikel, produktart, sprache)` |
 
 Metafeld-Definitionen im neuen Shop (*Einstellungen → Benutzerdefinierte Daten → Produkte*), Namensraum `grundfos`:
 
@@ -63,6 +64,12 @@ Metafeld-Definitionen im neuen Shop (*Einstellungen → Benutzerdefinierte Daten
 - Hochladen: Colab `tools/import/Medien_Upload_Colab.ipynb` (Secrets `SUPABASE_DB_URL`, `SUPABASE_SERVICE_KEY`), TIF → PNG;
   `.np2` (Grundfos-Zeichnungsformat) wird geprüft und ggf. als „format_unbekannt“ markiert
 - Export: `Image Src` (erstes Bild, weitere als Zusatzzeilen), Metafeld `dokumente` (Datenblätter, Anleitungen, Maß-/Schaltbilder)
+- `pim.shop_dokumente()` (0033): Dokumente in der Shop-Sprache, sonst Englisch, mehrsprachige GPC-Dokumente („COMMON“)
+  immer; Ersatzteile erhalten zusätzlich Service-Kataloge und Explosionszeichnungen der Baureihen der passenden Pumpen.
+  Fehler bis 0032 behoben: der Filter erwartete `de`/`en`, die GPC-Dokumente tragen `DEU`/`ENU` → Anleitungen fehlten
+- `.np2` (Grundfos-Zeichnungsformat, ca. 4.000 Maß-, Schalt- und Explosionszeichnungen): proprietäres, bitweise
+  kodiertes Format, in der Zeitbox nicht entschlüsselbar → bleiben `format_unbekannt`; Ersatz: Service-PDFs (s. o.),
+  Baureihenbild; Option: Zeichnungen bei Grundfos als PNG/PDF anfragen
 
 **Mehrsprachigkeit**
 - `pim.uebersetzung`: 1,11 Mio. Einträge aus den 33 GPC-Sprachpaketen (Produktgruppen, Anwendungen, Ersatzteil- und

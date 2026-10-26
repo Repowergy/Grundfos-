@@ -105,10 +105,16 @@ def abfrage(q, versuche=4):
 
 def run(ausgabe, kanal="mastershop_pilot"):
     zeilen = []
-    stand = 0
+    stand, groesse = 0, 40
     while True:   # in Paketen, damit jede Abfrage unter dem API-Zeitlimit bleibt
-        paket = abfrage(f"select * from pim.v_shop_export_de where kanal = '{kanal}' and rang > {stand} "
-                        f"order by rang limit 40")
+        try:
+            paket = abfrage(f"select * from pim.v_shop_export_de where kanal = '{kanal}' and rang > {stand} "
+                            f"order by rang limit {groesse}")
+        except SystemExit:
+            if groesse == 1:
+                raise
+            groesse = max(1, groesse // 2)   # Ersatzteile mit sehr vielen Pumpen brauchen länger → kleinere Pakete
+            continue
         if not paket:
             break
         zeilen += paket
@@ -127,12 +133,14 @@ def run(ausgabe, kanal="mastershop_pilot"):
     handle = {r["artikel_id"]: r["handle"] for r in zeilen}
     ids = list(handle)
     for sp in SPRACHEN:
-        for i in range(0, len(ids), 80):
-            teil = ",".join(str(x) for x in ids[i:i + 80])
-            for r in abfrage(f"select id, pim.shop_produkt(id, '{sp}') d from unnest(array[{teil}]::bigint[]) id"):
+        for i in range(0, len(ids), 40):
+            teil = ",".join(str(x) for x in ids[i:i + 40])
+            for r in abfrage(f"select id, d, pim.shop_dokumente(id, d->>'produktart', '{sp}') dok from "
+                             f"(select id, pim.shop_produkt(id, '{sp}') d from unnest(array[{teil}]::bigint[]) id) x"):
                 d = r["d"] or {}
                 ue[handle[r["id"]]][sp] = {k: d.get(k) for k in ("titel", "body_html", "kurz", "baureihe_text",
                                                                   "technische_daten")}
+                ue[handle[r["id"]]][sp]["dokumente"] = r["dok"]
     with open(ausgabe + ".uebersetzungen.json", "w", encoding="utf-8") as f:
         json.dump(ue, f, ensure_ascii=False)
     print(f"Übersetzungen ({', '.join(SPRACHEN)}) → {ausgabe}.uebersetzungen.json")
