@@ -402,3 +402,47 @@ medien_upload.run('/content/drive/MyDrive')
 ]
 (here / "Medien_Upload_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells8), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Medien_Upload_Colab.ipynb")
+
+# ── Import 7: Nachtrag nach der Vollständigkeitsprüfung Drive ↔ Supabase ──
+na_code = (here / "nachtrag_import.py").read_text(encoding="utf-8")
+gi_code = (here / "gpi_import.py").read_text(encoding="utf-8")
+cells9 = [
+    md("""
+# Grundfos-PIM – Import 7: Nachtrag (Vollständigkeitsprüfung 26.10.2026)
+
+Liest alles aus *GRUNDFOS – Zentrale Projektablage* (alle Unterordner, auch in ZIP/RAR-Archiven), was noch nicht in
+Supabase ist:
+- **DATANORM 2016** (Original DATANORM 2016: Folgedatei `.002`, Rabatt- und Warengruppen) und **DATANORM 2015**
+  (`GF_DNM4_MP.zip`)
+- **Access-Datenbanken** ETB_DTXT, ETB_WAE, ETBv, GPIUser
+- alles, was am 26.10. neu hochgeladen wurde: *Bildzuordnungen und Bildquellen (Shopify 2026)* –
+  Bildzuordnungs-Listen, Bilder, PDFs, Archive
+
+Bereits importierte Dateien werden übersprungen. Nur lesen – nichts wird verändert, Programme werden nie ausgeführt.
+Voraussetzung: Secret `SUPABASE_DB_URL`. **Laufzeit → Alle ausführen.** Dauer ca. 20–40 Minuten.
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!apt-get -qq install -y mdbtools unrar > /dev/null
+!pip -q install "psycopg[binary]>=3.1" openpyxl rarfile
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/arge_import.py\n" + arge_code),
+    py("%%writefile /content/projektablage_import.py\n" + pa_code),
+    py("%%writefile /content/gpi_import.py\n" + gi_code),
+    py("%%writefile /content/nachtrag_import.py\n" + na_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, arge_import, projektablage_import, gpi_import, nachtrag_import
+for m in (datenaudit, datanorm_import, arge_import, projektablage_import, gpi_import, nachtrag_import):
+    importlib.reload(m)
+nachtrag_import.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – die letzte Zeile (FERTIG …) an Claude schicken."),
+]
+(here / "Import_Nachtrag_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells9), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_Nachtrag_Colab.ipynb")

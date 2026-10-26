@@ -278,7 +278,8 @@ def import_datanorm_file(con, root, lauf_id, path, known):
     datum, info = v_info(v)
     is_aux = os.path.splitext(path)[1].lower() in (".wrg", ".rab")
     hersteller_kopf = "GRUNDFOS" in v.upper()
-    gf_code = bool(re.search(r"(^|[;\s])GF alle Preisangaben", v))   # Grundfos-Daten über Großhandel/Datendienst
+    # Grundfos-Daten über Großhandel/Datendienst; Kopf z. B. „V 161215GF alle Preisangaben in Euro“ (Datum direkt davor)
+    gf_code = bool(re.search(r"(^|[;\s\d])GF alle Preisangaben", v))
     gf_kopf = hersteller_kopf or gf_code
     if not gf_kopf:
         # Entscheidung 24.10.2026: nur Grundfos-Quellen (Grundfos GmbH, „GF“-Datei); Großhändler und

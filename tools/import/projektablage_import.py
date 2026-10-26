@@ -37,6 +37,7 @@ DATANORM_ORDNER = ("DATANORM NEU 1", "DATANORM NEU 2", "DATANORM NEU – Hauptda
 TABELLE = {".csv", ".xlsx", ".xlsm"}
 TEXT = {".md", ".txt", ".json", ".py", ".sh", ".jsonl"}
 TEXT_MAX = 5_000_000
+BILD = {".jpg", ".jpeg", ".png", ".gif", ".tif", ".tiff", ".bmp", ".webp"}
 
 
 def lese(name, data):
@@ -50,7 +51,8 @@ def lese(name, data):
     if ext in TEXT and len(data) <= TEXT_MAX:
         enc = guess_encoding(data[:200000])
         return ext.lstrip("."), enc, {os.path.basename(name): [{"text": data.decode(enc, errors="replace")}]}
-    return ext.lstrip(".") or "datei", None, {"_dateien": [{"name": os.path.basename(name), "groesse": len(data)}]}
+    fmt = "bild" if ext in BILD else (ext.lstrip(".") or "datei")   # 'bild' wie ARGE 2015 → Medienzuordnung
+    return fmt, None, {"_dateien": [{"name": os.path.basename(name), "groesse": len(data)}]}
 
 
 def speichere(cur, lauf_id, rel, data, name):
