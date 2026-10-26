@@ -51,9 +51,9 @@ Metafeld-Definitionen im neuen Shop (*Einstellungen → Benutzerdefinierte Daten
 ## 4. Offen
 
 - Preise (Listenpreise 2015/16 vorhanden, aber veraltet)
-- Bild- und Dokumentrechte
+- ~~Bild- und Dokumentrechte~~ – Freigabe liegt vor (26.10.); Upload per Colab
 - Shop anlegen und hier verbinden (Shopify-Connector zeigt derzeit solarics.de)
-- Weitere Sprachen (Texte en vorhanden; fr/it/nl/pl über die Text-Engine)
+- ~~Weitere Sprachen~~ – siehe Abschnitt 5
 
 
 ## 5. Ausbau 26.10.2026 (Schritte 1–4)
