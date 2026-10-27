@@ -172,7 +172,10 @@ def zuordnen(z, standard, generisch):
             "hersteller": g("manufacturer", "brand"), "mpn": g("manufacturer_article_number"), "ean": g("ean", "gtin"),
             "bezeichnung": g("product_full_name", "product_name") or name_aus_url(url), "baureihe": g("product_series"),
             "kategorie": g("product_category", "category_path", "breadcrumb"), "url": url,
-            "preis": mbi.zahl(g("price")), "preis_typ": "netto" if NETTO.search(vat) and not BRUTTO.search(vat) else "brutto",
+            # price / price_gross (brutto) oder nur price_net (netto, z. B. sealing.com.ua)
+            "preis": mbi.zahl(g("price", "price_gross") or g("price_net")),
+            "preis_typ": "netto" if (not g("price", "price_gross") and g("price_net"))
+                         or (NETTO.search(vat) and not BRUTTO.search(vat)) else "brutto",
             "waehrung": (g("currency") or "EUR")[:3].upper(),
             "lagerbestand": lager(g("availability", "stock_status")),
             "lieferzeit": g("delivery_time"), "erfasst_am": mbi.datum(g("scraped_at")),
@@ -200,7 +203,8 @@ def verarbeite(con, shop):
 
     rd = zeilen(pfad)
     kopf = rd.fieldnames or []
-    standard = {"price", "product_url"} <= set(kopf) and ("manufacturer_article_number" in kopf or "manufacturer" in kopf)
+    standard = ("product_url" in kopf and ({"price", "price_gross", "price_net"} & set(kopf))
+                and ("manufacturer_article_number" in kopf or "manufacturer" in kopf))
     generisch = {} if standard else mbi.spalten(list(itertools.islice(zeilen(pfad), 300)))
 
     auszug, gelesen, domains, laender, staende = [], 0, {}, {}, []
