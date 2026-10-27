@@ -101,6 +101,10 @@ def abfrage(q, versuche=4):
             if i == versuche - 1 or "502" not in str(e) and "544" not in str(e):
                 raise
             time.sleep(5 * (i + 1))
+        except OSError:   # Verbindung abgebrochen (z. B. Connection reset by peer)
+            if i == versuche - 1:
+                raise
+            time.sleep(5 * (i + 1))
 
 
 def run(ausgabe, kanal="mastershop_pilot"):
