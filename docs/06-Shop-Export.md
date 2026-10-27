@@ -95,3 +95,17 @@ Metafeld-Definitionen im neuen Shop (*Einstellungen → Benutzerdefinierte Daten
   übrige Teile passen nur zu Pumpen ohne Produktgruppe)
 - `pim.shop_ersatzteil_kategorien(artikel, sprache)`: bis zu 3 Pfade „Ersatzteile > Bereich > Baureihe“ (häufigste zuerst), in allen
   Shop-Sprachen; Pilot: alle 1.297 Ersatzteile eingeordnet, 151 Pfade in 9 Bereichen
+
+## Fachwörterbuch (27.10.2026)
+
+Fehlende Übersetzungen der Shop-Auswahl werden mit `pim.glossar_bedarf_sammeln()` (per pg_cron, ca. 15 min) in
+`pim._glossar_bedarf` gesammelt, außerhalb übersetzt und mit `tools/import/glossar_laden.py` geladen – als
+`merkmal_uebersetzung.status = 'maschinell'` bzw. `uebersetzung.herkunft = 'maschinell'`; Grundfos-Einträge werden nie überschrieben.
+
+Stand Pilot nach dem Lauf: Merkmalsnamen 1.788, Merkmalswerte 8.112, Teilenamen 2.261, Baureihentexte 139 (+ SCALA2 in
+`SHOP_SERIE`). Ergebnis in `pim.shop_text`: Merkmalsnamen der technischen Daten in allen 23 Sprachen zu 100 % übersetzt,
+Pumpentexte 680/680 (nb/sk 677 – drei MGE-Motoren ohne Baureihentext).
+
+Offen: rund 900 Ersatzteile/Zubehöre ohne englischen Teiletitel, deren Typbezeichnung selbst ein englischer Name ist
+(z. B. „Flanges, threaded“, 432 verschiedene Texte) – Titel bleiben in allen Sprachen englisch.
+Kennzahl `shop_text.technik_uebersetzt_pct` = Anteil der technischen Daten mit Merkmalsnamen in der Sprache (0049).
