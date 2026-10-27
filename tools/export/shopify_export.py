@@ -141,12 +141,15 @@ def uebersetzungen(ausgabe, handle):
     for sp in SPRACHEN:
         for i in range(0, len(ids), 40):
             teil = ",".join(str(x) for x in ids[i:i + 40])
-            for r in abfrage(f"select id, d, pim.shop_dokumente(id, d->>'produktart', '{sp}') dok from "
+            for r in abfrage(f"select id, d, pim.shop_dokumente(id, d->>'produktart', '{sp}') dok, "
+                             f"case when d->>'produktart' = 'ersatzteil' then pim.shop_ersatzteil_kategorien(id, '{sp}') end kat from "
                              f"(select id, pim.shop_produkt(id, '{sp}') d from unnest(array[{teil}]::bigint[]) id) x"):
                 d = r["d"] or {}
                 ue[handle[r["id"]]][sp] = {k: d.get(k) for k in ("titel", "body_html", "kurz", "baureihe_text",
                                                                   "technische_daten")}
                 ue[handle[r["id"]]][sp]["dokumente"] = r["dok"]
+                if r.get("kat"):   # Ersatzteile: Kategoriepfad je Sprache
+                    ue[handle[r["id"]]][sp]["kategorien"] = r["kat"]
         print(f"  {sp}: {len(ids)} Produkte", flush=True)
     with open(ausgabe + ".uebersetzungen.json", "w", encoding="utf-8") as f:
         json.dump(ue, f, ensure_ascii=False)
