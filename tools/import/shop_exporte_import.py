@@ -110,6 +110,20 @@ def lager(v):
     return SCHEMA_LAGER.get(k.lower(), k)
 
 
+LEER = {"", "-", "--", "n/a", "na", "none", "null", "not_found", "not found", "unknown", "unbekannt", "k.a.", "0"}
+
+
+def name_aus_url(url):
+    """Produktname aus der URL, wenn der Export keinen hat: …/12027-grundfos-pompa-cm-a-3-4-cod-92889472.html"""
+    if not url:
+        return None
+    teil = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
+    teil = re.sub(r"\.(html?|php|aspx?)$", "", teil, flags=re.I)
+    teil = re.sub(r"^\d+[-_]", "", teil)
+    teil = re.sub(r"[-_+]+", " ", teil).strip()
+    return teil or None
+
+
 def pumpenhersteller(hersteller, name):
     """→ Anzeige-Name des Pumpenherstellers oder None"""
     for txt in (hersteller, name):
@@ -151,12 +165,13 @@ def zeilen(pfad):
 def zuordnen(z, standard, generisch):
     """Eine Zeile → Felder für import_zeilen (Scraper-Standard oder Spaltenerkennung von Import 9)."""
     if standard:
-        g = lambda *ks: next((z[k].strip() for k in ks if (z.get(k) or "").strip()), None)  # noqa: E731
+        g = lambda *ks: next((z[k].strip() for k in ks if (z.get(k) or "").strip().lower() not in LEER), None)  # noqa: E731
         vat = g("vat_info") or ""
+        url = g("product_url", "canonical_url")
         return {
             "hersteller": g("manufacturer", "brand"), "mpn": g("manufacturer_article_number"), "ean": g("ean", "gtin"),
-            "bezeichnung": g("product_full_name", "product_name"), "baureihe": g("product_series"),
-            "kategorie": g("product_category", "category_path", "breadcrumb"), "url": g("product_url", "canonical_url"),
+            "bezeichnung": g("product_full_name", "product_name") or name_aus_url(url), "baureihe": g("product_series"),
+            "kategorie": g("product_category", "category_path", "breadcrumb"), "url": url,
             "preis": mbi.zahl(g("price")), "preis_typ": "netto" if NETTO.search(vat) and not BRUTTO.search(vat) else "brutto",
             "waehrung": (g("currency") or "EUR")[:3].upper(),
             "lagerbestand": lager(g("availability", "stock_status")),
@@ -199,9 +214,12 @@ def verarbeite(con, shop):
             continue
         if not f["hersteller"] and ph:
             f["hersteller"] = ph
-        if not f["mpn"] and ph == "Grundfos" and f["bezeichnung"]:
-            m = GF_NR.search(f["bezeichnung"])      # Grundfos-Nummer steht oft nur im Produktnamen
-            f["mpn"] = m.group(1) if m else None
+        if not f["mpn"] and ph == "Grundfos":       # Grundfos-Nummer steht oft nur im Namen, in der URL oder als Shop-Nummer
+            for quelle in (f["bezeichnung"], f["url"] and urlparse(f["url"]).path, f.get("shop_nr")):
+                m = GF_NR.search(quelle or "")
+                if m:
+                    f["mpn"] = m.group(1)
+                    break
         if f["url"]:
             h = urlparse(f["url"]).hostname or ""
             domains[h] = domains.get(h, 0) + 1
@@ -221,8 +239,14 @@ def verarbeite(con, shop):
     with con.cursor() as cur:
         cur.execute("select marktbegleiter.firma_ermitteln(%s, %s, %s)", (name, dom, lnd))
         firma_id = cur.fetchone()[0]
-        cur.execute("select id, status from marktbegleiter.importe where firma_id = %s and datei_sha256 = %s", (firma_id, sha))
+        cur.execute("""select i.id, i.status, (select count(*) from marktbegleiter.preise p where p.import_id = i.id)
+                         from marktbegleiter.importe i where i.firma_id = %s and i.datei_sha256 = %s""", (firma_id, sha))
         alt = cur.fetchone()
+        if alt and alt[2] == 0:      # früherer Lauf ohne einen einzigen Preis (z. B. Spalten nicht erkannt) → neu einlesen
+            cur.execute("delete from marktbegleiter.import_zeilen where import_id = %s", (alt[0],))
+            cur.execute("delete from marktbegleiter.importe where id = %s", (alt[0],))
+            log(f"  {name}: früherer Import {alt[0]} ohne Preise – wird neu eingelesen")
+            alt = None
         if alt:
             con.commit()
             log(f"  {name}: schon importiert (Import {alt[0]}, {alt[1]})")
