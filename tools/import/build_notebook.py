@@ -479,3 +479,42 @@ grosse_csv_import.run('/content/drive/MyDrive')
 ]
 (here / "Import_GrundfosFULL_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells10), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_GrundfosFULL_Colab.ipynb")
+
+# ── Import 9: Preislisten der Marktbegleiter → Schema marktbegleiter (vertraulich) ──
+mb_code = (here / "marktbegleiter_import.py").read_text(encoding="utf-8")
+cells11 = [
+    md("""
+# Grundfos-PIM – Import 9: Preislisten der Marktbegleiter → Supabase (vertraulich)
+
+**Ablage in Drive:** Ordner *GRUNDFOS – Marktbegleiter Preise*, darin **ein Unterordner je Marktbegleiter** mit Land in Klammern,
+z. B. `Pumpenhandel Muster (DE)` oder `haustechnik-beispiel.at (AT)`. Dort die Preislisten ablegen (CSV, Excel, JSON/JSONL).
+Optional `firma.json` mit `{"name", "domain", "land", "ansprechpartner", "email", "preisart", "preis_typ", "waehrung"}`
+(`preisart`: oeffentlich | haendlerpreis | angebot · `preis_typ`: netto | brutto).
+
+Jede Datei wird einmal importiert (gleiche Datei erneut → übersprungen). Preise bleiben als Historie erhalten.
+Ausgabe am Ende: Ergebnis je Firma (zugeordnet, Vorschläge zur Kontrolle, nicht zugeordnet, fehlerhaft, Dubletten).
+
+Voraussetzung: Secret `SUPABASE_DB_URL`. **Laufzeit → Alle ausführen.**
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip -q install "psycopg[binary]>=3.1" openpyxl
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/arge_import.py\n" + arge_code),
+    py("%%writefile /content/projektablage_import.py\n" + pa_code),
+    py("%%writefile /content/marktbegleiter_import.py\n" + mb_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, arge_import, projektablage_import, marktbegleiter_import
+for m in (datenaudit, datanorm_import, arge_import, projektablage_import, marktbegleiter_import): importlib.reload(m)
+marktbegleiter_import.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – die Ergebnis-Tabelle (letzte Zeilen) an Claude schicken."),
+]
+(here / "Import_Marktbegleiter_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells11), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_Marktbegleiter_Colab.ipynb")
