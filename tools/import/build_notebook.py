@@ -518,3 +518,42 @@ marktbegleiter_import.run('/content/drive/MyDrive')
 ]
 (here / "Import_Marktbegleiter_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells11), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_Marktbegleiter_Colab.ipynb")
+
+# ── Import 10: Shop-Exporte (Scraper) aus Drive → Schema marktbegleiter (vertraulich) ──
+se_code = (here / "shop_exporte_import.py").read_text(encoding="utf-8")
+cells12 = [
+    md("""
+# Grundfos-PIM – Import 10: Shop-Exporte der Marktbegleiter → Supabase (vertraulich)
+
+Lädt die in **„Marktbegleiter aus Drive“** angehakten Shop-Exporte (29 Shops) direkt über ihre Drive-ID – die Dateien werden
+nur gelesen, nicht verschoben. Übernommen werden **nur Produkte von Pumpenherstellern** (Grundfos, Wilo, KSB, DAB, Biral …);
+Artikelnummer ist immer die **Herstellernummer**, nie die Shop-Nummer. Preise bleiben als Historie erhalten, dieselbe Datei
+wird nur einmal importiert. Ergebnis je Shop am Ende.
+
+Voraussetzung: Secret `SUPABASE_DB_URL`. Beim Start fragt Google nach der Anmeldung – das Konto wählen, dem die Dateien
+gehören (repowergy@gmail.com). **Laufzeit → Alle ausführen.** Dauer: je nach Dateigröße 10–40 Minuten.
+"""),
+    py("""
+from google.colab import auth, userdata
+auth.authenticate_user()
+!pip -q install "psycopg[binary]>=3.1" openpyxl
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/arge_import.py\n" + arge_code),
+    py("%%writefile /content/projektablage_import.py\n" + pa_code),
+    py("%%writefile /content/marktbegleiter_import.py\n" + mb_code),
+    py("%%writefile /content/shop_exporte_import.py\n" + se_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, arge_import, projektablage_import, marktbegleiter_import, shop_exporte_import
+for m in (datenaudit, datanorm_import, arge_import, projektablage_import, marktbegleiter_import, shop_exporte_import):
+    importlib.reload(m)
+shop_exporte_import.run()
+"""),
+    md("## Fertig – die Ergebnis-Tabelle (letzte Zeilen) an Claude schicken."),
+]
+(here / "Import_ShopExporte_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells12), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_ShopExporte_Colab.ipynb")

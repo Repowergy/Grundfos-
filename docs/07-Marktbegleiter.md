@@ -34,6 +34,13 @@ Drive: `GRUNDFOS – Marktbegleiter Preise/<Firma oder Domain> (<Land>)/<Datei>`
 Formate: CSV, XLSX/XLSM, JSON/JSONL. Firma über Domain bzw. Name + Land; gleiche Datei je Firma nur einmal; Dubletten (in der Datei und
 gegenüber früheren Importen) werden gezählt, nicht gespeichert; Original unverändert in `raw.quelldatei`.
 
+## Import 10: Shop-Exporte aus Drive
+Auswahl der Shops in der Seite „Marktbegleiter aus Drive“ (29 angehakt am 27.10.2026) → `tools/import/shop_exporte_import.py` /
+`Import_ShopExporte_Colab.ipynb`. Lädt die Exporte (Scraper-Standardformat) per Drive-ID, übernimmt nur Produkte von
+Pumpenherstellern (`FILTER = "pumpen"`, alternativ `"grundfos"` oder `"alle"`); Artikelnummer = `manufacturer_article_number`
+(nie Shop-Nummer/SKU), bei Grundfos sonst 8-stellige Nummer aus dem Produktnamen; netto/brutto aus `vat_info`; Datum = `scraped_at`.
+Original bleibt in Drive, in `import_zeilen.rohdaten` nur ein Auszug.
+
 ## Direkte Einlieferung (OpenClaw / Scraper) – 0041
 `select marktbegleiter.einliefern('<json>'::jsonb)` – ein Aufruf je Shop und Lauf, gleiche Verarbeitung wie Import 9
 (Prüfung, USt/EUR, Dubletten, Historie, Zuordnung). Gleicher Lauf (Stand + Positionen) für dieselbe Firma wird nur einmal gespeichert
