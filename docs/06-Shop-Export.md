@@ -89,3 +89,9 @@ Metafeld-Definitionen im neuen Shop (*Einstellungen → Benutzerdefinierte Daten
   „Original-Grundfos-Ersatzteil … Passend für: CM, CME“, Metafeld `passt_zu` (Pumpen-Artikelnummern)
 - Verknüpfung Pumpe ↔ Ersatzteil fest im Stamm: 6.988.538 Verknüpfungen, 336.307 Pumpen, 86.815 Teile, alle mit
   Produktionszeitraum, 3,2 Mio. mit Positionsnummer; dazu 100.000 Service-Sonderausführungen (Website 2026, Kandidaten)
+
+**Ersatzteil-Kategorien** (27.10.2026, 0041/0042)
+- `pim.ersatzteil_baureihe`: je Ersatzteil die Baureihen der passenden Pumpen mit Anzahl (138.665 Zeilen, 67.929 von 86.815 Teilen;
+  übrige Teile passen nur zu Pumpen ohne Produktgruppe)
+- `pim.shop_ersatzteil_kategorien(artikel, sprache)`: bis zu 3 Pfade „Ersatzteile > Bereich > Baureihe“ (häufigste zuerst), in allen
+  Shop-Sprachen; Pilot: alle 1.297 Ersatzteile eingeordnet, 151 Pfade in 9 Bereichen
