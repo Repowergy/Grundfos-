@@ -446,3 +446,36 @@ nachtrag_import.run('/content/drive/MyDrive')
 ]
 (here / "Import_Nachtrag_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells9), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_Nachtrag_Colab.ipynb")
+
+# ── Import 8: große CSV-Dateien stückweise (Grundfos_FULL.csv) ──
+gc_code = (here / "grosse_csv_import.py").read_text(encoding="utf-8")
+cells10 = [
+    md("""
+# Grundfos-PIM – Import 8: Grundfos_FULL.csv stückweise → Supabase
+
+Die Datei *02 Grundfos / Grundfos Daten X Shopify / Grundfos_FULL.csv* (191 MB) ist für das normale Einlesen zu groß.
+Hier wird sie Zeile für Zeile gelesen und in Paketen zu 50.000 Zeilen gespeichert. Bricht der Lauf ab, einfach neu
+starten – er setzt nach dem letzten Paket fort.
+
+Nur lesen, nichts wird verändert. Voraussetzung: Secret `SUPABASE_DB_URL`. **Laufzeit → Alle ausführen.** Dauer ca. 10–20 Minuten.
+"""),
+    py("""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip -q install "psycopg[binary]>=3.1"
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/grosse_csv_import.py\n" + gc_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, grosse_csv_import
+for m in (datenaudit, datanorm_import, grosse_csv_import): importlib.reload(m)
+grosse_csv_import.run('/content/drive/MyDrive')
+"""),
+    md("## Fertig – die letzte Zeile (FERTIG …) an Claude schicken."),
+]
+(here / "Import_GrundfosFULL_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells10), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_GrundfosFULL_Colab.ipynb")
