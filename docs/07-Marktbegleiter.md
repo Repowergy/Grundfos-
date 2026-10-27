@@ -34,6 +34,32 @@ Drive: `GRUNDFOS – Marktbegleiter Preise/<Firma oder Domain> (<Land>)/<Datei>`
 Formate: CSV, XLSX/XLSM, JSON/JSONL. Firma über Domain bzw. Name + Land; gleiche Datei je Firma nur einmal; Dubletten (in der Datei und
 gegenüber früheren Importen) werden gezählt, nicht gespeichert; Original unverändert in `raw.quelldatei`.
 
+## Direkte Einlieferung (OpenClaw / Scraper) – 0041
+`select marktbegleiter.einliefern('<json>'::jsonb)` – ein Aufruf je Shop und Lauf, gleiche Verarbeitung wie Import 9
+(Prüfung, USt/EUR, Dubletten, Historie, Zuordnung). Gleicher Lauf (Stand + Positionen) für dieselbe Firma wird nur einmal gespeichert
+(`schon_eingeliefert`). Rolle **`openclaw_import`** darf nur diese Funktion aufrufen (keine Tabellen, kein `pim`, keine öffentliche API);
+Passwort setzt der Betreiber: `alter role openclaw_import with password '…';` · Verbindung: Session pooler mit Benutzer
+`openclaw_import.xgpkjxjwcxelskygojvl`.
+
+```json
+{ "firma": {"name": "Selfio", "domain": "selfio.de", "land": "DE"},
+  "stand": "2026-10-27", "preisart": "oeffentlich", "lauf": "OpenClaw",
+  "positionen": [ {"hersteller": "Grundfos", "artikelnummer": "99411165", "ean": "…", "bezeichnung": "ALPHA2 25-40 180",
+                   "preis": 206.80, "preis_typ": "brutto", "waehrung": "EUR", "versand": 0, "lieferbar": true,
+                   "lieferzeit": "1-3 Tage", "staffel_ab": 1, "url": "https://…"} ] }
+```
+Pflicht: `firma.land` (ISO, UK → GB), `firma.domain` oder `firma.name`, je Position `preis` und `preis_typ` (netto|brutto).
+`domain` = Shop, nie das Preisportal. `artikelnummer` = Herstellernummer; Platzhalter wie „unbekannt“, „n/a“ werden ignoriert.
+Optional je Position: `ust_satz`, `preiseinheit`, `mengeneinheit`, `mindestmenge`, `lagerbestand`, `gueltig_ab/bis`, `erfasst_am`,
+`baureihe`, `kategorie`, `preisart`. Antwort: `status` (fertig | teilweise | fehler | schon_eingeliefert), `ergebnis`, `fehler`.
+Getestet 27.10.2026 (Staffel, CHF, Wilo, „unbekannt“ + Bezeichnung → Vorschlag, Dublette, ohne preis_typ, ohne Land, Doppellauf,
+Folgetag nur mit Domain); Testdaten entfernt.
+
+## Prüfung 27.10.2026 (0041)
+EZB-Referenzkurse 26.10.2026 für CHF, GBP, DKK, SEK, NOK, PLN, CZK, HUF, RON, ISK, USD (+ BGN fest) statt CHF-Annahme; 41 CHF-Preise
+neu umgerechnet · Land UK → GB (8 Firmen) · 6 Recherche-Shops, die unter der Domain des Preisportals angelegt waren (selfio.de,
+heizungsdiscount24.de, Kaufland.de, Raleo, Amazon.de, Galaxus.ch), in den vorhandenen Firmeneintrag zusammengeführt → 301 Firmen.
+
 ## Übernahme 27.10.2026
 279 Firmen aus `pim.wettbewerber` (gleiche IDs) + 28 Shops aus Preisen ohne Firmenzuordnung → 307 Firmen; 195 Preise aus
 `pim.marktpreis` (alte ID in `alt_marktpreis_id`); 177 Produkte: 132 eindeutig über Artikelnummer (26 Grundfos-Artikel), 45 Vorschlag.
