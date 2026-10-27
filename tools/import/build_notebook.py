@@ -526,8 +526,8 @@ cells12 = [
 # Grundfos-PIM – Import 10: Shop-Exporte der Marktbegleiter → Supabase (vertraulich)
 
 Lädt die in **„Marktbegleiter aus Drive“** angehakten Shop-Exporte (29 Shops) direkt über ihre Drive-ID – die Dateien werden
-nur gelesen, nicht verschoben. Übernommen werden **nur Produkte von Pumpenherstellern** (Grundfos, Wilo, KSB, DAB, Biral …);
-Artikelnummer ist immer die **Herstellernummer**, nie die Shop-Nummer. Preise bleiben als Historie erhalten, dieselbe Datei
+nur gelesen, nicht verschoben. Übernommen wird das **gesamte Sortiment** jedes Shops (alle Hersteller);
+Artikelnummer ist immer die **Herstellernummer**, nie die Shop-Nummer. Zugeordnet zum Grundfos-Stamm werden nur Grundfos-Produkte. Preise bleiben als Historie erhalten, dieselbe Datei
 wird nur einmal importiert. Ergebnis je Shop am Ende.
 
 Voraussetzung: Secret `SUPABASE_DB_URL`. Beim Start fragt Google nach der Anmeldung – das Konto wählen, dem die Dateien

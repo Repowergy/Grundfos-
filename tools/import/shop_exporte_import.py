@@ -10,12 +10,13 @@ Andere Formate (eigene Spaltennamen) laufen über die Spaltenerkennung von Impor
 Je Datei:
   1. per Drive-ID herunterladen (nur lesen), Prüfsumme – dieselbe Datei wird je Firma nur einmal importiert
   2. Firma über Domain der Produkt-URLs bzw. Name + Land (marktbegleiter.firma_ermitteln)
-  3. Zeilen streamen und filtern (FILTER): "pumpen" = Produkte von Pumpenherstellern (Standard),
-     "grundfos" = nur Grundfos, "alle" = gesamter Shop
+  3. Zeilen streamen und filtern (FILTER): "alle" = gesamtes Sortiment (Standard), "pumpen" = nur Produkte von
+     Pumpenherstellern, "grundfos" = nur Grundfos
   4. Zuordnung der Spalten: Hersteller = manufacturer/brand (sonst aus dem Produktnamen), Artikelnummer = NUR
      manufacturer_article_number (nie Shop-Nummer/SKU), EAN = ean/gtin, Preis netto/brutto aus vat_info,
      Datum = scraped_at → marktbegleiter.import_zeilen → marktbegleiter.import_verarbeiten()
-Das Original bleibt in Drive; in der Datenbank wird nur der gefilterte Auszug gespeichert (rohdaten gekürzt).
+Das Original bleibt in Drive; gespeichert werden Produkte und Preise. Aus der Zwischenablage (import_zeilen) werden die
+fehlerfrei verarbeiteten Zeilen danach entfernt – sie stehen vollständig in preise; Fehler und Dubletten bleiben zur Kontrolle.
 Marktpreise werden nie als eigene Preise übernommen; der Grundfos-Stamm (pim) wird nur gelesen.
 
 Voraussetzung (Colab): Secret SUPABASE_DB_URL, Drive-Anmeldung (auth.authenticate_user).
@@ -37,7 +38,7 @@ import marktbegleiter_import as mbi
 from datanorm_import import conn_params, db_url
 from datenaudit import log
 
-FILTER = "pumpen"          # "pumpen" | "grundfos" | "alle"
+FILTER = "alle"            # "alle" (gesamtes Sortiment, Auswahl 27.10.2026) | "pumpen" | "grundfos"
 ZIEL = "/content/shopexporte"
 
 # (Schlüssel, Name, Domain, Land, Drive-Datei-ID, Dateiname) – angehakt in „Marktbegleiter aus Drive“
@@ -246,6 +247,7 @@ def verarbeite(con, shop):
                               f["waehrung"], f["lagerbestand"], f["lieferzeit"], f["erfasst_am"] or stand, f["url"], lnd))
         cur.execute("select schritt, anzahl from marktbegleiter.import_verarbeiten(%s)", (import_id,))
         erg = dict(cur.fetchall())
+        cur.execute("delete from marktbegleiter.import_zeilen where import_id = %s and status = 'ok'", (import_id,))
     con.commit()
     log(f"  {name} ({dom}, {lnd}): {gelesen} gelesen → {len(auszug)} übernommen · {erg}")
 

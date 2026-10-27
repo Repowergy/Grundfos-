@@ -36,10 +36,11 @@ gegenüber früheren Importen) werden gezählt, nicht gespeichert; Original unve
 
 ## Import 10: Shop-Exporte aus Drive
 Auswahl der Shops in der Seite „Marktbegleiter aus Drive“ (29 angehakt am 27.10.2026) → `tools/import/shop_exporte_import.py` /
-`Import_ShopExporte_Colab.ipynb`. Lädt die Exporte (Scraper-Standardformat) per Drive-ID, übernimmt nur Produkte von
-Pumpenherstellern (`FILTER = "pumpen"`, alternativ `"grundfos"` oder `"alle"`); Artikelnummer = `manufacturer_article_number`
+`Import_ShopExporte_Colab.ipynb`. Lädt die Exporte (Scraper-Standardformat) per Drive-ID, übernimmt das gesamte Sortiment
+(`FILTER = "alle"`, alternativ `"pumpen"` oder `"grundfos"`); Artikelnummer = `manufacturer_article_number`
 (nie Shop-Nummer/SKU), bei Grundfos sonst 8-stellige Nummer aus dem Produktnamen; netto/brutto aus `vat_info`; Datum = `scraped_at`.
-Original bleibt in Drive, in `import_zeilen.rohdaten` nur ein Auszug.
+Original bleibt in Drive; fehlerfrei verarbeitete Zeilen werden aus `import_zeilen` entfernt (stehen in `preise`).
+0043: VVS- und Bezeichnungs-Zuordnung nur für Grundfos/ohne Hersteller (keine Zufallstreffer fremder Marken).
 
 ## Direkte Einlieferung (OpenClaw / Scraper) – 0041
 `select marktbegleiter.einliefern('<json>'::jsonb)` – ein Aufruf je Shop und Lauf, gleiche Verarbeitung wie Import 9
