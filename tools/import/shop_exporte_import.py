@@ -153,13 +153,13 @@ def lade(file_id, datei):
 
 
 def zeilen(pfad):
-    """CSV streamen (Trennzeichen erkennen, sehr lange Felder erlauben)."""
+    """CSV streamen (Trennzeichen erkennen, sehr lange Felder erlauben, NUL-Zeichen entfernen – PostgreSQL lehnt sie ab)."""
     csv.field_size_limit(sys.maxsize)
     fh = open(pfad, encoding="utf-8-sig", errors="replace", newline="")
     probe = fh.read(20000)
     fh.seek(0)
     trenner = max((",", ";", "\t"), key=lambda t: probe.split("\n", 1)[0].count(t))
-    return csv.DictReader(fh, delimiter=trenner)
+    return csv.DictReader((z.replace("\x00", "") for z in fh), delimiter=trenner)
 
 
 def zuordnen(z, standard, generisch):
