@@ -198,10 +198,43 @@ def verarbeite(con, root, pfad, fi):
     log(f"  {rel}: {erg} · Spalten {rollen}")
 
 
+def _ordnername(n):
+    """Vergleichsform: Groß/klein, Bindestrich-Varianten (– — -) und Leerzeichen egal."""
+    return re.sub(r"[\s\-–—_]+", " ", n).strip().lower()
+
+
+def finde_ordner(root, ordner=ORDNER):
+    """Ordner in „Meine Ablage“ suchen – direkt oder bis zu zwei Ebenen tiefer (z. B. GRUNDFOS/…), auch geteilte Ablagen."""
+    ziel = _ordnername(ordner)
+    wurzeln = [root] + [d for d in ("/content/drive/Shareddrives", "/content/drive/Shared drives") if os.path.isdir(d)]
+    aehnlich = []
+    for w in wurzeln:
+        for dp, dn, _fn in os.walk(w):
+            tiefe = os.path.relpath(dp, w).count(os.sep) + (0 if dp == w else 1)
+            for d in dn:
+                if _ordnername(d) == ziel:
+                    return os.path.join(dp, d)
+                if "marktbegleiter" in d.lower():
+                    aehnlich.append(os.path.join(dp, d))
+            if tiefe >= 2:
+                dn[:] = []
+            else:
+                dn[:] = [d for d in dn if not d.startswith(".")]
+    passend = [a for a in aehnlich if "preis" in os.path.basename(a).lower()]
+    if len(passend) == 1:
+        return passend[0]
+    hinweis = ("\n  Gefundene Ordner mit „Marktbegleiter“ im Namen:\n    " + "\n    ".join(aehnlich)) if aehnlich else ""
+    raise SystemExit(f"Ordner „{ordner}“ nicht gefunden – bitte in Google Drive unter „Meine Ablage“ anlegen, "
+                     f"darin je Marktbegleiter ein Unterordner „Name (Land)“ mit den Preislisten.{hinweis}")
+
+
 def run(root="/content/drive/MyDrive", ordner=ORDNER):
-    base = os.path.join(root, ordner)
-    if not os.path.isdir(base):
-        raise SystemExit(f"Ordner „{ordner}“ nicht gefunden – bitte in Drive anlegen (je Marktbegleiter ein Unterordner)")
+    base = finde_ordner(root, ordner)
+    log(f"Ordner: {base}")
+    lose = [f for f in os.listdir(base) if os.path.isfile(os.path.join(base, f)) and f.lower().endswith(ENDUNGEN)]
+    if lose:
+        log(f"  ⚠ {len(lose)} Datei(en) liegen direkt im Ordner und werden übersprungen – bitte in den Unterordner "
+            f"der jeweiligen Firma „Name (Land)“ verschieben: {', '.join(sorted(lose)[:10])}")
     with psycopg.connect(**conn_params(db_url()), autocommit=False) as con:
         with con.cursor() as cur:
             cur.execute("set statement_timeout = 0")
