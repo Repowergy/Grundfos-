@@ -238,20 +238,27 @@ def run(root="/content/drive/MyDrive", ordner=ORDNER):
     with psycopg.connect(**conn_params(db_url()), autocommit=False) as con:
         with con.cursor() as cur:
             cur.execute("set statement_timeout = 0")
+        dateien = 0
         for eintrag in sorted(os.listdir(base)):
             sub = os.path.join(base, eintrag)
             if not os.path.isdir(sub):
                 continue
             fi = firma_info(eintrag, sub)
             log(f"{fi['name']} ({fi['land'] or 'Land?'})")
+            if not fi["land"]:
+                log("  ⚠ kein Land im Ordnernamen – bitte „Name (DE)“ o. ä. verwenden")
             for dp, _dn, fn in os.walk(sub):
                 for f in sorted(fn):
                     if f.lower().endswith(ENDUNGEN) and f != "firma.json":
+                        dateien += 1
                         try:
                             verarbeite(con, root, os.path.join(dp, f), fi)
                         except Exception as e:  # noqa: BLE001 – eine kaputte Datei soll den Lauf nicht stoppen
                             con.rollback()
                             log(f"  ⚠ Fehler bei {f}: {e!r}")
+        if not dateien:
+            log("  ⚠ keine Preislisten gefunden – je Marktbegleiter einen Unterordner „Name (Land)“ anlegen und die Dateien "
+                f"({', '.join(ENDUNGEN)}) hineinlegen")
         with con.cursor() as cur:
             cur.execute("""select f.name, f.land, i.dateiname, i.status, i.positionen, i.zugeordnet, i.vorschlaege,
                                   i.nicht_zugeordnet, i.fehlerhaft, i.dubletten
