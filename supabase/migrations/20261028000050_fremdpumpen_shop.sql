@@ -194,7 +194,8 @@ begin
   select string_agg(' – ' || case when z = 'ELEKTRIK' then pim.fremd_wert(f.daten, 'ELEKTRIK')
                                   when z = 'NR' then f.produktnummer
                                   when z = 'IMPELNOM' then 'Ø ' || (e->>'wert')
-                                  when (f.daten->z->>'einheit') is not null or z in ('P2KW56', 'P1WMAX', 'PORTPORT', 'N56') then e->>'wert'
+                                  when ((f.daten->z->>'einheit') is not null or z in ('P2KW56', 'P1WMAX', 'PORTPORT', 'N56'))
+                                       and (e->>'wert') ~ '^[0-9]' then e->>'wert'
                                   else (e->>'name') || ' ' || (e->>'wert') end, '' order by o)
     into v_zusatz
     from jsonb_array_elements_text(f.zusatz) with ordinality zz(z, o)
