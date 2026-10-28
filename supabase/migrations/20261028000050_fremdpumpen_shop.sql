@@ -136,7 +136,7 @@ as $$
            'code', w.code,
            'name', coalesce(u.bezeichnung, e.bezeichnung, w.name_quelle),
            'wert', case when w.einheit in ('AISI', 'ASTM', 'DIN W.-Nr.') then w.einheit || ' ' || w.wert
-                        when w.wert ~ '^-?[0-9]+([.,][0-9]+)?$' and w.einheit is not null
+                        when w.wert ~ '^-?[0-9]+([.,][0-9]+)?(\s*[/-]\s*-?[0-9]+([.,][0-9]+)?)*$' and w.einheit is not null   -- auch 400/230
                              then case when p_sprache like 'en%' then w.wert else replace(w.wert, '.', ',') end || ' ' || w.einheit
                         when upper(w.wert) in ('Y', 'YES') then coalesce(initcap(pim.uebersetze('DB_DVAC_FAIL_CONTACT', 'YES', p_sprache)),
                                                                          case p_sprache when 'de' then 'Ja' else 'Yes' end)
