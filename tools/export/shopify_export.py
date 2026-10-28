@@ -4,6 +4,8 @@ Grundfos-PIM → Shopify-Produkt-CSV (Mastershop). Liest pim.v_shop_export_de f�
 im Shopify-Importformat (Produkte → Importieren).
 
   python3 -I tools/export/shopify_export.py <ausgabe.csv> [kanal]     # Standard-Kanal: mastershop_pilot
+  python3 -I tools/export/shopify_export.py --fremdpumpen <ausgabe.csv> [sprachen, z. B. en,fr]
+        Pumpen weiterer Hersteller (pim.shop_fremd_text, deutsch in der CSV, weitere Sprachen in <ausgabe>.uebersetzungen.jsonl)
 
 Festlegungen Pilot (26.10.2026):
   - Status „draft“, Published FALSE – nichts ist sofort sichtbar
@@ -166,7 +168,65 @@ def nur_uebersetzungen(ausgabe, kanal="mastershop_pilot"):
                              if r["artikelnummer"] in sku_handle})
 
 
+def slug(t):
+    t = t.lower().translate(str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "ø": "o", "~": "-"}))
+    return "-".join("".join(c if c.isalnum() else " " for c in t).split())
+
+
+def fremdpumpen(ausgabe, sprachen=",".join(SPRACHEN)):
+    """Pumpen weiterer Hersteller (Texte aus pim.shop_fremd_text) als eigene Shop-Produkte – ohne Preis, als Entwurf"""
+    zeilen, stand = [], 0
+    while True:
+        paket = abfrage(f"""select t.fremd_id, t.sku, t.hersteller, t.titel, t.kurz, t.body_html, t.kategorien, t.technische_daten,
+                                   s.name, coalesce(z.serie_anzeige, s.serie) serie
+                              from pim.shop_fremd_text t join pim.fremd_shop s on s.id = t.fremd_id
+                              left join pim.fremd_serie z on z.hersteller = s.hersteller and z.serie = s.serie
+                             where t.sprache = 'de' and t.fremd_id > {stand} order by t.fremd_id limit 2000""")
+        if not paket:
+            break
+        zeilen += paket
+        stand = paket[-1]["fremd_id"]
+    handle = {}
+    with open(ausgabe, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(SPALTEN)
+        for r in zeilen:
+            h = handle[r["fremd_id"]] = f"{slug(r['titel'])}-{r['fremd_id']}"
+            z = dict.fromkeys(SPALTEN, "")
+            z.update({"Handle": h, "Title": r["titel"], "Body (HTML)": r["body_html"] or "", "Vendor": r["hersteller"],
+                      "Type": r["kurz"] or "", "Tags": ", ".join(x for x in ("Fremdpumpe", r["hersteller"], r["serie"]) if x),
+                      "Published": "FALSE", "Option1 Name": "Title", "Option1 Value": "Default Title", "Variant SKU": r["sku"] or "",
+                      "Variant Weight Unit": "kg", "Variant Inventory Policy": "deny", "Variant Fulfillment Service": "manual",
+                      "Variant Requires Shipping": "TRUE", "Variant Taxable": "TRUE", "SEO Title": r["titel"][:70],
+                      "SEO Description": f"{r['titel']} – {r['kurz'] or ''}"[:320], "Status": "draft",
+                      f"Typbezeichnung ({META}typbezeichnung)": r["name"],
+                      f"Technische Daten ({META}technische_daten)": json.dumps(r["technische_daten"], ensure_ascii=False),
+                      f"Produktart ({META}produktart)": "fremdpumpe",
+                      f"Kategorien ({META}kategorien)": json.dumps(r["kategorien"], ensure_ascii=False)})
+            w.writerow([z[k] for k in SPALTEN])
+    print(f"{len(zeilen)} Fremdpumpen → {ausgabe}", flush=True)
+    with open(ausgabe + ".uebersetzungen.jsonl", "w", encoding="utf-8") as f:   # eine Zeile je Handle und Sprache
+        for sp in [x for x in sprachen.split(",") if x]:
+            stand, n = 0, 0
+            while True:
+                paket = abfrage(f"""select fremd_id, titel, kurz, body_html, kategorien, technische_daten from pim.shop_fremd_text
+                                     where sprache = '{sp}' and fremd_id > {stand} order by fremd_id limit 2000""")
+                if not paket:
+                    break
+                for r in paket:
+                    if r["fremd_id"] in handle:
+                        f.write(json.dumps({"handle": handle[r["fremd_id"]], "sprache": sp,
+                                            **{k: r[k] for k in ("titel", "kurz", "body_html", "kategorien", "technische_daten")}},
+                                           ensure_ascii=False) + "\n")
+                        n += 1
+                stand = paket[-1]["fremd_id"]
+            print(f"  {sp}: {n} Produkte", flush=True)
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--fremdpumpen"]:
+        fremdpumpen(*sys.argv[2:4])
+        sys.exit()
     if sys.argv[1:2] == ["--nur-uebersetzungen"]:
         nur_uebersetzungen(*sys.argv[2:4])
     else:
