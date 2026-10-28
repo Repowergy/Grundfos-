@@ -72,6 +72,12 @@ as $$
               else nullif(btrim(p_daten->p_code->>'wert'), '') end
 $$;
 
+-- Vergleichsform eines Werts: „18,5“ = „18.5“, „DN125“ = „DN 125“
+create or replace function pim.fremd_norm(t text)
+returns text
+language sql immutable
+as $$ select lower(regexp_replace(replace(t, ',', '.'), '\s', '', 'g')) $$;
+
 create or replace function pim.fremd_shop_aufbauen()
 returns bigint
 language plpgsql
@@ -86,19 +92,20 @@ begin
     from (select f.*, h.anzeige,
                  btrim(coalesce(nullif(btrim(f.daten->'PRODNAME'->>'wert'), ''), nullif(btrim(f.daten->'COMB_PRODUCT_NAME'->>'wert'), ''),
                                 f.typ)) as name,
-                 row_number() over (partition by f.hersteller, f.typ, f.frequenz, (f.daten - '_schnellaustausch_id') order by f.id) nr
+                 row_number() over (partition by f.hersteller, f.typ, f.frequenz,   -- „18,5“ und „18.5“ gelten als gleich
+                                    regexp_replace((f.daten - '_schnellaustausch_id')::text, '(\d),(\d)', '\1.\2', 'g') order by f.id) nr
             from pim.fremdprodukt f join pim.fremd_hersteller h on h.hersteller = f.hersteller and h.im_shop) x
    where nr = 1;
   -- gleich benannte Varianten nacheinander über die aussagekräftigsten abweichenden Merkmale unterscheiden
   foreach k in array array['ELEKTRIK', 'P2KW56', 'P1WMAX', 'IMPELNOM', 'STAGE', 'PIPECON', 'PIPEPRES', 'PORTPORT', 'N56', 'IMPELCOD',
                            'SHAFTSEAL', 'MATPUMPH', 'MATIM', 'PIPESTD', 'INSDRYWET', 'COOLINGJ', 'EXPUMPS1', 'IMPELTYPE'] loop
     update pim.fremd_shop t set zusatz = t.zusatz || to_jsonb(k),
-                                unterscheidung = t.unterscheidung || '|' || coalesce(pim.fremd_wert(f.daten, k), '')
+                                unterscheidung = t.unterscheidung || '|' || coalesce(pim.fremd_norm(pim.fremd_wert(f.daten, k)), '')
       from pim.fremdprodukt f,
            (select s.hersteller, s.name, s.frequenz, s.unterscheidung
               from pim.fremd_shop s join pim.fremdprodukt f on f.id = s.id
              group by 1, 2, 3, 4
-            having count(*) > 1 and count(distinct coalesce(pim.fremd_wert(f.daten, k), '')) > 1) g
+            having count(*) > 1 and count(distinct coalesce(pim.fremd_norm(pim.fremd_wert(f.daten, k)), '')) > 1) g
      where f.id = t.id and g.hersteller = t.hersteller and g.name = t.name and g.frequenz is not distinct from t.frequenz
        and g.unterscheidung = t.unterscheidung;
   end loop;
@@ -114,6 +121,9 @@ revoke execute on function pim.fremd_shop_aufbauen() from public, anon, authenti
 
 drop view if exists pim.v_fremd_shop;
 select pim.fremd_shop_aufbauen();
+-- Texte von Varianten, die keine Shop-Variante (mehr) sind, entfernen
+delete from pim.shop_fremd_text t where not exists (select 1 from pim.fremd_shop s where s.id = t.fremd_id);
+delete from pim.shop_fremd_auftrag a where not exists (select 1 from pim.fremd_shop s where s.id = a.fremd_id);
 
 -- Technische Daten: Name aus dem Merkmalsstamm (Sprache → en → Name im Datensatz), Wert übersetzt bzw. mit Einheit
 create or replace function pim.shop_fremd_technik(p_id bigint, p_sprache text default 'de')
