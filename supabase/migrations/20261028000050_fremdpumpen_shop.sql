@@ -44,11 +44,15 @@ language sql immutable
 as $$
   select case when p_hersteller = 'FLYGT' then p_baureihe
               when p_baureihe_code in ('ESVFAM', 'CDLFAM') then p_baureihe
+              -- KSB „22-2 E (Riovar)“: Baureihe steht in Klammern am Ende
+              when p_hersteller = 'KSB' and p_typ ~ '\(\s*(Rio|Rovi|Eta|Calio)[A-Za-z-]*[^)]*\)\s*$'
+                then substring(p_typ from '\(\s*((Rio|Rovi|Eta|Calio)[A-Za-z-]*)[^)]*\)\s*$')
               else coalesce(substring(regexp_replace(p_typ, '^\(Star\)\s*', 'Star ') from '[A-Za-z][A-Za-z-]*'), p_typ) end
 $$;
 
--- Shop-Varianten: exakte Dubletten entfernt; name = echte Typbezeichnung (PRODNAME, z. B. „1SV22T“ – „typ“ fasst Varianten
--- teils zusammen); zusatz = Merkmale, die gleich benannte Varianten unterscheiden (für den Titel, je Sprache formatiert)
+-- Shop-Varianten: exakte Dubletten entfernt; name = Typbezeichnung aus „typ“ (PRODNAME in den Daten ist bei KSB/Lowara gegenüber
+-- den technischen Daten verrutscht, z. B. Lowara-Anschluss passt zum Typ-Suffix T/C/V/F, nicht zu PRODNAME → nicht verwenden);
+-- zusatz = Merkmale, die gleich benannte Varianten unterscheiden (für den Titel, je Sprache formatiert)
 create table if not exists pim.fremd_shop (
   id                 bigint primary key references pim.fremdprodukt(id) on delete cascade,
   hersteller         text not null,
@@ -61,6 +65,15 @@ create table if not exists pim.fremd_shop (
 );
 alter table pim.fremd_shop add column if not exists unterscheidung text not null default '';
 alter table pim.fremd_shop enable row level security;
+
+create or replace function pim.fremd_name(p_hersteller text, p_typ text)
+returns text
+language sql immutable
+as $$
+  select btrim(regexp_replace(case when p_hersteller = 'KSB' and p_typ ~ '\(\s*(Rio|Rovi|Eta|Calio)[A-Za-z-]*[^)]*\)\s*$'   -- „22-2 E (Riovar)“ → „Riovar 22-2 E“
+                                   then substring(p_typ from '\(([^)]*)\)\s*$') || ' ' || regexp_replace(p_typ, '\s*\([^)]*\)\s*$', '')
+                                   else p_typ end, '\s+', ' ', 'g'))
+$$;
 
 create or replace function pim.fremd_wert(p_daten jsonb, p_code text)
 returns text
@@ -90,8 +103,7 @@ begin
   insert into pim.fremd_shop (id, hersteller, hersteller_anzeige, serie, name, frequenz)
   select id, hersteller, anzeige, pim.fremd_serie_schluessel(hersteller, typ, baureihe, baureihe_code), name, frequenz
     from (select f.*, h.anzeige,
-                 btrim(coalesce(nullif(btrim(f.daten->'PRODNAME'->>'wert'), ''), nullif(btrim(f.daten->'COMB_PRODUCT_NAME'->>'wert'), ''),
-                                f.typ)) as name,
+                 pim.fremd_name(f.hersteller, f.typ) as name,
                  row_number() over (partition by f.hersteller, f.typ, f.frequenz,   -- „18,5“ und „18.5“ gelten als gleich
                                     regexp_replace((f.daten - '_schnellaustausch_id')::text, '(\d),(\d)', '\1.\2', 'g') order by f.id) nr
             from pim.fremdprodukt f join pim.fremd_hersteller h on h.hersteller = f.hersteller and h.im_shop) x
@@ -201,7 +213,7 @@ begin
 
   return jsonb_build_object(
     'sprache', p_sprache,
-    'sku', f.produktnummer,
+    'sku', f.produktnummer || case when f.frequenz = 60 then '-60HZ' else '' end,   -- gleiche Nummer für 50/60 Hz
     'hersteller', f.hersteller_anzeige,
     'typ', f.name,
     'frequenz', f.frequenz,
