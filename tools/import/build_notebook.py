@@ -557,3 +557,43 @@ shop_exporte_import.run()
 ]
 (here / "Import_ShopExporte_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells12), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_ShopExporte_Colab.ipynb")
+
+# ── Import 11: Brücke PriceClaw (solarics-produktdaten, offers) → Schema marktbegleiter ──
+pc_code = (here / "priceclaw_bruecke.py").read_text(encoding="utf-8")
+cells13 = [
+    md("""
+# Grundfos-PIM – Import 11: Brücke PriceClaw → Marktbegleiter (vertraulich)
+
+Übernimmt die Scrapes, die OpenClaw an **PriceClaw** (Supabase-Projekt *solarics-produktdaten*, Tabelle `offers`) liefert,
+für die Marktbegleiter-Shops ins Grundfos-PIM (Schema `marktbegleiter`). **Nur gescrapte Marktpreise** (`herkunft = scrape`) –
+eigene Einkaufspreise und Einzelfunde werden nie übernommen. Jede Lieferung genau einmal; regelmäßig ausführbar
+(z. B. wöchentlich) – es kommt nur Neues dazu. PriceClaw wird nur gelesen.
+
+**Vorher einmalig:** zweites Secret **`SOLARICS_DB_URL`** anlegen – Verbindungszeile von *solarics-produktdaten*
+(Supabase → Projekt wechseln → Connect → Direct → Session pooler, mit Passwort) → Notebook-Zugriff einschalten.
+Dazu wie bisher `SUPABASE_DB_URL` (Grundfos-PIM). **Laufzeit → Alle ausführen.**
+"""),
+    py("""
+from google.colab import userdata
+!pip -q install "psycopg[binary]>=3.1" openpyxl
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/projektablage_import.py\n" + pa_code),
+    py("%%writefile /content/marktbegleiter_import.py\n" + mb_code),
+    py("%%writefile /content/shop_exporte_import.py\n" + se_code),
+    py("%%writefile /content/priceclaw_bruecke.py\n" + pc_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+os.environ['SOLARICS_DB_URL'] = userdata.get('SOLARICS_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, projektablage_import, marktbegleiter_import, shop_exporte_import, priceclaw_bruecke
+for m in (datenaudit, datanorm_import, projektablage_import, marktbegleiter_import, shop_exporte_import, priceclaw_bruecke):
+    importlib.reload(m)
+priceclaw_bruecke.run()
+"""),
+    md("## Fertig – die Übersicht am Ende an Claude schicken."),
+]
+(here / "Import_PriceClaw_Bruecke_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells13), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_PriceClaw_Bruecke_Colab.ipynb")
