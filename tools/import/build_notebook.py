@@ -518,3 +518,40 @@ marktbegleiter_import.run('/content/drive/MyDrive')
 ]
 (here / "Import_Marktbegleiter_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells11), ensure_ascii=False, indent=1), encoding="utf-8")
 print("geschrieben:", here / "Import_Marktbegleiter_Colab.ipynb")
+
+# ── Import 11: Grundfos-Angebote aus OpenClaw-Lieferungen (solarics-produktdaten) → Schema marktbegleiter ──
+oc_code = (here / "openclaw_uebernahme.py").read_text(encoding="utf-8")
+cells12 = [
+    md("""
+# Grundfos-PIM – Import 11: OpenClaw-Lieferungen → Marktbegleiter-Datenbank (vertraulich)
+
+Übernimmt aus dem Supabase-Projekt **solarics-produktdaten** alle **Grundfos-Angebote** der OpenClaw-Lieferungen
+(Standard: letzte 3 Tage) in das Schema `marktbegleiter` von **Grundfos-PIM**. In solarics-produktdaten wird nur gelesen.
+Jede Lieferdatei wird einmal übernommen (erneuter Lauf → übersprungen); Preise bleiben als Historie erhalten.
+
+**Vorher einmalig zwei Secrets** (Schlüssel-Symbol links, jeweils Notebook-Zugriff einschalten):
+- `SUPABASE_DB_URL` – Grundfos-PIM (wie bei den anderen Imports)
+- `SOLARICS_DB_URL` – solarics-produktdaten: Supabase → Projekt *solarics-produktdaten* → Connect → **Session pooler**, mit Passwort
+
+Dann **Laufzeit → Alle ausführen** (wenige Minuten).
+"""),
+    py("""
+from google.colab import userdata
+!pip -q install "psycopg[binary]>=3.1"
+"""),
+    py("%%writefile /content/datenaudit.py\n" + helpers),
+    py("%%writefile /content/datanorm_import.py\n" + code),
+    py("%%writefile /content/openclaw_uebernahme.py\n" + oc_code),
+    py("""
+import os, sys, importlib
+os.environ['SUPABASE_DB_URL'] = userdata.get('SUPABASE_DB_URL')
+os.environ['SOLARICS_DB_URL'] = userdata.get('SOLARICS_DB_URL')
+sys.path.insert(0, '/content')
+import datenaudit, datanorm_import, openclaw_uebernahme
+for m in (datenaudit, datanorm_import, openclaw_uebernahme): importlib.reload(m)
+openclaw_uebernahme.run()          # z. B. openclaw_uebernahme.run('2026-10-20') für einen früheren Zeitraum
+"""),
+    md("## Fertig – die Ergebnis-Tabelle (letzte Zeilen) an Claude schicken."),
+]
+(here / "Import_OpenClaw_Colab.ipynb").write_text(json.dumps(dict(nb, cells=cells12), ensure_ascii=False, indent=1), encoding="utf-8")
+print("geschrieben:", here / "Import_OpenClaw_Colab.ipynb")

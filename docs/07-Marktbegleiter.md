@@ -42,3 +42,13 @@ falsche EAN-Prüfziffer) sowie Doppelimport, Preishistorie, Änderungssperre und
 
 Hinweis: 0036 hatte die Recherche-Tabellen kurzzeitig in ein Schema „markt“ verschoben; 0037 hat den ursprünglichen Zustand
 exakt wiederhergestellt.
+
+## Import 11: OpenClaw-Lieferungen (28.10.2026)
+
+OpenClaw liefert Shop-Exporte per Drive/rclone in das Supabase-Projekt *solarics-produktdaten*
+(`public.source_files` „openclaw_<shop>_<zeit>“, `public.offers`). `tools/import/openclaw_uebernahme.py`
+(Notebook `Import_OpenClaw_Colab.ipynb`) übernimmt daraus die **Grundfos-Angebote** in `marktbegleiter`:
+je Lieferdatei ein Import (`format = 'openclaw'`, Prüfsumme der Lieferung → nur einmal), Firma über Domain/Land,
+dann `import_verarbeiten`. In solarics-produktdaten wird nur gelesen (Lese-Transaktion).
+Netto/Brutto aus der Lieferung bzw. der Quelle, sonst brutto (im Import vermerkt).
+Secrets: `SUPABASE_DB_URL` (Grundfos-PIM) und `SOLARICS_DB_URL` (solarics-produktdaten, Session pooler).
